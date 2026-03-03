@@ -1,4 +1,4 @@
-package com.cv.SpendSense;
+package com.cv.SnapExpense;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

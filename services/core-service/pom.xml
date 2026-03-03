@@ -9,9 +9,9 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.cv</groupId>
-	<artifactId>SpendSense</artifactId>
+	<artifactId>SnapExpense</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>SpendSense</name>
+	<name>SnapExpense</name>
 	<description>Smart Expense Tracking App</description>
 	<url/>
 	<licenses>
