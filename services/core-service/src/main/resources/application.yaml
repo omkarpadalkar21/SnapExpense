@@ -1,3 +1,11 @@
 spring:
   application:
     name: SnapExpense
+
+jwt:
+  secret:
+    key: NGcBg3HXwWwe+ZULip6sBwsU8/tW7YnycZVt2VV5GQVb28xGHUxd8LdgK30ThHh+upC44dWRPs0p9Hy8nhgqww==
+  access-key:
+    expiration: 86400000
+  refresh-key:
+    expiration: 604800000
