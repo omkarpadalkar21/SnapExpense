@@ -2,6 +2,23 @@ spring:
   application:
     name: SnapExpense
 
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 5MB
+      max-request-size: 5MB
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database: PostgreSQL
+    defer-datasource-initialization: true
+  datasource:
+    url: jdbc:postgresql://localhost:5432/${POSTGRES_DB:SnapExpense}
+    username: user
+    password: changemeinprod!
+  sql:
+    init:
+      mode: always
 jwt:
   secret:
     key: NGcBg3HXwWwe+ZULip6sBwsU8/tW7YnycZVt2VV5GQVb28xGHUxd8LdgK30ThHh+upC44dWRPs0p9Hy8nhgqww==
@@ -9,3 +26,17 @@ jwt:
     expiration: 86400000
   refresh-key:
     expiration: 604800000
+
+cloud:
+  aws:
+    credentials:
+      access-key: ${S3-ACCESS-KEY}
+      secret-key: ${S3-SECRET-KEY}
+    region: auto
+    s3:
+      endpoint: ${S3-ENDPOINT}
+
+aws:
+  bucket:
+    name: ${S3-BUCKET-NAME}
+

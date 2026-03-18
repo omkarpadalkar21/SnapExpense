@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, HttpUrl
 
 class OCRRequest(BaseModel):
     """Request model for OCR extraction with pre-signed URL"""
-    presigned_url: HttpUrl = Field(..., description="AWS S3 pre-signed URL for the receipt image")
+    presigned_url: str = Field(..., description="AWS S3 pre-signed URL for the receipt image")
 
 
 class ReceiptItemDTO(BaseModel):
