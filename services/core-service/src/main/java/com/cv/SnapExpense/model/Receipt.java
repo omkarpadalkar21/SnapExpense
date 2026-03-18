@@ -49,7 +49,7 @@ public class Receipt {
     @Column(precision = 10, scale = 2, nullable = false)
     private BigDecimal totalAmount;
 
-    @Column(nullable = false)
+    @Column
     private LocalDate receiptDate;
 
     @OneToMany(mappedBy = "receipt", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

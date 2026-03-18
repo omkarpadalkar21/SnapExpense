@@ -57,26 +57,25 @@ public class JwtService {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    private String generateAccessToken(UserDetails userDetails) {
+    public String generateAccessToken(UserDetails userDetails) {
         return buildToken(new HashMap<>(), userDetails, accessKeyExpiration);
     }
 
-    private String generateRefreshToken(UserDetails userDetails, String ipAddress) {
+    public RefreshToken generateRefreshToken(UserDetails userDetails) {
         String token = buildToken(new HashMap<>(), userDetails, refreshKeyExpiration);
 
         RefreshToken refreshToken = RefreshToken.builder()
                 .user((User) userDetails)
                 .token(token)
                 .expiresAt(LocalDateTime.now().plus(Duration.ofMillis(refreshKeyExpiration)))
-                .ipAddress(ipAddress)
                 .build();
 
         refreshTokenRepository.save(refreshToken);
 
-        return token;
+        return refreshToken;
     }
 
-    private boolean validateRefreshToken(String token){
+    private boolean validateRefreshToken(String token) {
         Optional<RefreshToken> refreshToken = refreshTokenRepository.getRefreshTokenByToken(token);
 
         return refreshToken.map(value -> value.getExpiresAt().isAfter(LocalDateTime.now())).orElse(false);

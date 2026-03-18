@@ -1,0 +1,3436 @@
+Directory structure:
+└── services/
+    ├── ai-service/
+    │   ├── README.md
+    │   ├── Dockerfile
+    │   ├── downloader.py
+    │   ├── main.py
+    │   ├── models.py
+    │   ├── ocr_service.py
+    │   └── requirements.txt
+    └── core-service/
+        ├── mvnw
+        ├── mvnw.cmd
+        ├── pom.xml
+        ├── src/
+        │   ├── main/
+        │   │   ├── java/
+        │   │   │   └── com/
+        │   │   │       └── cv/
+        │   │   │           └── SnapExpense/
+        │   │   │               ├── SnapExpenseApplication.java
+        │   │   │               ├── config/
+        │   │   │               │   └── S3Config.java
+        │   │   │               ├── controller/
+        │   │   │               │   ├── AuthenticationController.java
+        │   │   │               │   └── ReceiptController.java
+        │   │   │               ├── dto/
+        │   │   │               │   ├── LoginRequest.java
+        │   │   │               │   ├── LoginResponse.java
+        │   │   │               │   ├── LogoutRequest.java
+        │   │   │               │   ├── NewAccessTokenRequest.java
+        │   │   │               │   ├── NewAccessTokenResponse.java
+        │   │   │               │   ├── ReceiptItem.java
+        │   │   │               │   ├── ReceiptOcrResponse.java
+        │   │   │               │   ├── RegistrationRequest.java
+        │   │   │               │   ├── RegistrationResponse.java
+        │   │   │               │   └── receipt/
+        │   │   │               │       ├── CategoryResponse.java
+        │   │   │               │       ├── PageResponse.java
+        │   │   │               │       ├── ReceiptItemRequest.java
+        │   │   │               │       ├── ReceiptItemResponse.java
+        │   │   │               │       ├── ReceiptResponse.java
+        │   │   │               │       ├── ReceiptUpdateRequest.java
+        │   │   │               │       └── ReceiptVerificationResponse.java
+        │   │   │               ├── mapper/
+        │   │   │               │   └── ReceiptMapper.java
+        │   │   │               ├── model/
+        │   │   │               │   ├── Category.java
+        │   │   │               │   ├── MonthlyBudget.java
+        │   │   │               │   ├── Receipt.java
+        │   │   │               │   ├── ReceiptItem.java
+        │   │   │               │   ├── RefreshToken.java
+        │   │   │               │   └── User.java
+        │   │   │               ├── repository/
+        │   │   │               │   ├── CategoryRepository.java
+        │   │   │               │   ├── ReceiptItemRepository.java
+        │   │   │               │   ├── ReceiptRepository.java
+        │   │   │               │   ├── RefreshTokenRepository.java
+        │   │   │               │   └── UserRepository.java
+        │   │   │               ├── security/
+        │   │   │               │   ├── BeanConfig.java
+        │   │   │               │   ├── JwtFilter.java
+        │   │   │               │   └── SecurityConfig.java
+        │   │   │               └── service/
+        │   │   │                   ├── AuthenticationService.java
+        │   │   │                   ├── FastAPIService.java
+        │   │   │                   ├── JwtService.java
+        │   │   │                   ├── ReceiptService.java
+        │   │   │                   ├── S3Service.java
+        │   │   │                   └── impl/
+        │   │   │                       ├── ReceiptServiceImpl.java
+        │   │   │                       └── S3ServiceImpl.java
+        │   │   └── resources/
+        │   │       ├── application.yaml
+        │   │       └── data.sql
+        │   └── test/
+        │       └── java/
+        │           └── com/
+        │               └── cv/
+        │                   └── SnapExpense/
+        │                       └── SpendSenseApplicationTests.java
+        └── .mvn/
+            └── wrapper/
+                └── maven-wrapper.properties
+
+================================================
+FILE: ai-service/README.md
+================================================
+# AI Service OCR
+
+FastAPI service for OCR processing of receipt images using PaddleOCR. This service transforms raw OCR output into structured receipt data compatible with the SnapExpense Spring Boot application.
+
+## Features
+
+- **PaddleOCR Integration**: Advanced text extraction from receipt images
+- **Structured Data Output**: Transforms raw OCR to structured receipt data
+- **AWS S3 Support**: Downloads images from pre-signed URLs
+- **Multipart Downloads**: Efficient handling of large image files
+- **Spring Boot Compatible**: Output format matches core-service DTOs
+- **Docker Support**: Containerized deployment ready
+
+## API Endpoints
+
+### POST /ocr/extract
+
+Extract structured data from receipt image.
+
+**Request:**
+
+```json
+{
+  "presigned_url": "https://s3.amazonaws.com/bucket/receipt.jpg"
+}
+```
+
+**Response:**
+
+```json
+{
+  "merchantName": "Big Bazaar Jaipur",
+  "totalAmount": 845.5,
+  "receiptDate": "2026-03-03",
+  "items": [
+    {
+      "name": "Rice 5kg",
+      "quantity": 1.0,
+      "unitPrice": 320.0,
+      "totalPrice": 320.0
+    }
+  ],
+  "ocrRawText": "Big Bazaar Jaipur Rice 5kg ₹320.00...",
+  "ocrConfidence": 0.921
+}
+```
+
+### GET /health
+
+Health check endpoint.
+
+**Response:**
+
+```json
+{
+  "status": "healthy",
+  "service": "ai-service",
+  "version": "1.0.0"
+}
+```
+
+## Quick Start
+
+### Using Docker
+
+1. Build the image:
+
+```bash
+docker build -t ai-service-ocr .
+```
+
+2. Run the container:
+
+```bash
+docker run -p 8000:8000 ai-service-ocr
+```
+
+### Local Development
+
+1. Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+2. Run the service:
+
+```bash
+python main.py
+```
+
+The service will be available at `http://localhost:8000`
+
+## Environment Variables
+
+- `HOST`: Server host (default: 0.0.0.0)
+- `PORT`: Server port (default: 8000)
+
+## Architecture
+
+```
+├── main.py              # FastAPI application and endpoints
+├── models.py            # Pydantic models matching Spring Boot DTOs
+├── downloader.py       # Multipart HTTP Range downloader
+├── ocr_service.py      # PaddleOCR integration + parsing logic
+├── requirements.txt    # Python dependencies
+└── Dockerfile          # Container configuration
+```
+
+## OCR Processing
+
+The service processes images through these steps:
+
+1. **Download**: Downloads image from AWS S3 pre-signed URL using HTTP Range headers
+2. **Extract**: Uses PaddleOCR to extract text with confidence scores
+3. **Parse**: Transforms raw OCR output to structured receipt data
+4. **Return**: Returns formatted data compatible with Spring Boot DTOs
+
+## Error Handling
+
+- Returns structured error responses for all failure cases
+- Graceful degradation when OCR fails (returns empty structure)
+- Automatic cleanup of temporary files
+- Comprehensive logging for debugging
+
+## Integration with SnapExpense
+
+This service is designed to integrate seamlessly with the SnapExpense core-service:
+
+- Receives pre-signed URLs generated by core-service
+- Returns data in the exact format expected by `OcrExtractedData` DTO
+- Handles AWS S3 authentication via URL parameters
+- Provides confidence scores for receipt verification workflow
+
+## Dependencies
+
+- FastAPI: Web framework
+- PaddleOCR: OCR engine
+- httpx: HTTP client for downloads
+- Pydantic: Data validation
+- uvicorn: ASGI server
+
+## Health Monitoring
+
+The service includes built-in health checks and monitoring:
+
+- `/health` endpoint for service status
+- Docker health check configuration
+- Comprehensive error logging
+- Performance metrics logging
+
+
+
+================================================
+FILE: ai-service/Dockerfile
+================================================
+# Stage 1: Build dependencies
+FROM python:3.11-slim as builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Stage 2: Final runtime image
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PADDLEOCR_NO_BUILD=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# Install only necessary runtime libraries
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libgomp1 \
+    libgl1 \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the virtual environment from the builder stage
+COPY --from=builder /opt/venv /opt/venv
+
+# Create a non-root user
+RUN useradd --create-home app && chown -R app:app /app
+
+# Copy application files
+COPY --chown=app:app . .
+
+USER app
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+EXPOSE 8000
+
+CMD ["python", "main.py"]
+
+
+
+================================================
+FILE: ai-service/downloader.py
+================================================
+import os
+import tempfile
+import httpx
+from urllib.parse import urlparse
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class MultipartDownloader:
+    """Downloads files from pre-signed S3/R2 URLs"""
+
+    def __init__(self):
+        self.timeout = httpx.Timeout(60.0, connect=10.0)
+
+    async def download_from_presigned_url(self, presigned_url: str) -> str:
+        """
+        Download file from a pre-signed S3/R2 URL.
+
+        Pre-signed URLs are signed for a specific set of headers (typically only 'host').
+        Adding ANY extra headers (e.g. Range, Content-Type) invalidates the signature
+        and causes a 403 Forbidden. Always use a plain GET with no extra headers.
+
+        Args:
+            presigned_url: Pre-signed URL (AWS S3 or Cloudflare R2)
+
+        Returns:
+            str: Path to downloaded temporary file
+
+        Raises:
+            Exception: If download fails
+        """
+        parsed_url = urlparse(presigned_url)
+        file_extension = os.path.splitext(parsed_url.path)[1] or '.jpg'
+
+        temp_file = tempfile.NamedTemporaryFile(suffix=file_extension, delete=False)
+        temp_path = temp_file.name
+        temp_file.close()
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout, verify=False) as client:
+                # Plain GET — do NOT add any headers; the URL is already signed for 'host' only
+                response = await client.get(presigned_url)
+                response.raise_for_status()
+
+                with open(temp_path, 'wb') as f:
+                    f.write(response.content)
+
+            logger.info(f"Downloaded {len(response.content)} bytes to {temp_path}")
+            return temp_path
+
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            logger.error(f"Download failed: {str(e)}")
+            raise Exception(f"Failed to download file: {str(e)}")
+
+    def cleanup_temp_file(self, file_path: str) -> None:
+        """Remove temporary file"""
+        try:
+            if os.path.exists(file_path):
+                os.unlink(file_path)
+                logger.info(f"Cleaned up: {file_path}")
+        except Exception as e:
+            logger.warning(f"Failed to cleanup {file_path}: {str(e)}")
+
+
+# Singleton instance
+downloader = MultipartDownloader()
+
+
+================================================
+FILE: ai-service/main.py
+================================================
+import logging
+import os
+import asyncio
+from contextlib import asynccontextmanager
+from typing import Dict
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from models import OCRRequest, OcrExtractedData, ErrorResponse, HealthResponse
+from downloader import downloader
+from ocr_service import ocr_service
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager"""
+    logger.info("Starting AI Service OCR...")
+    yield
+    logger.info("Shutting down AI Service OCR...")
+
+
+# Create FastAPI application
+app = FastAPI(
+    title="AI Service OCR",
+    description="FastAPI service for OCR processing of receipt images",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure appropriately for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler"""
+    logger.error(f"Unhandled exception: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content=ErrorResponse(
+            error="Internal server error",
+            code="INTERNAL_ERROR",
+            details={"message": str(exc)}
+        ).dict()
+    )
+
+
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    """Health check endpoint"""
+    return HealthResponse()
+
+
+@app.post("/ocr/extract", response_model=OcrExtractedData)
+async def extract_ocr(request: OCRRequest):
+    """
+    Extract OCR data from receipt image using pre-signed URL
+    
+    Args:
+        request: OCR request containing pre-signed URL
+        
+    Returns:
+        OcrExtractedData: Structured receipt data with OCR results
+    """
+    temp_file_path = None
+    
+    try:
+        logger.info(f"Processing OCR request for URL: {request.presigned_url}")
+        
+        # Download image from pre-signed URL
+        temp_file_path = await downloader.download_from_presigned_url(
+            str(request.presigned_url)
+        )
+        
+        # Perform OCR processing
+        paddleocr_result = ocr_service.extract_text_from_image(temp_file_path)
+        
+        # Parse receipt data
+        receipt_data = ocr_service.parse_receipt_data(paddleocr_result)
+        
+        logger.info(f"OCR processing completed. Confidence: {receipt_data.ocrConfidence}")
+        return receipt_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"OCR processing failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=ErrorResponse(
+                error=f"OCR processing failed: {str(e)}",
+                code="OCR_PROCESSING_ERROR"
+            ).dict()
+        )
+    finally:
+        # Clean up temporary file
+        if temp_file_path:
+            downloader.cleanup_temp_file(temp_file_path)
+
+
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "service": "AI Service OCR",
+        "version": "1.0.0",
+        "status": "running",
+        "endpoints": {
+            "health": "/health",
+            "ocr_extract": "/ocr/extract",
+            "docs": "/docs"
+        }
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    
+    # Configuration
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", 8000))
+    
+    logger.info(f"Starting AI Service OCR on {host}:{port}")
+    
+    uvicorn.run(
+        "main:app",
+        host=host,
+        port=port,
+        reload=False,  # Set to True for development
+        log_level="info"
+    )
+
+
+
+================================================
+FILE: ai-service/models.py
+================================================
+from typing import List, Optional
+from pydantic import BaseModel, Field, HttpUrl
+
+
+class OCRRequest(BaseModel):
+    """Request model for OCR extraction with pre-signed URL"""
+    presigned_url: str = Field(..., description="AWS S3 pre-signed URL for the receipt image")
+
+
+class ReceiptItemDTO(BaseModel):
+    """Individual receipt item structure matching Spring Boot DTO"""
+    name: str = Field(..., description="Item name/description")
+    quantity: float = Field(default=1.0, description="Item quantity")
+    unitPrice: float = Field(..., description="Price per unit")
+    totalPrice: float = Field(..., description="Total price for this item")
+
+
+class OcrExtractedData(BaseModel):
+    """Main OCR response structure matching Spring Boot OcrExtractedData DTO"""
+    merchantName: str = Field(default="", description="Extracted merchant/store name")
+    totalAmount: float = Field(default=0.0, description="Total amount from receipt")
+    receiptDate: Optional[str] = Field(default=None, description="Receipt date in YYYY-MM-DD format")
+    items: List[ReceiptItemDTO] = Field(default_factory=list, description="List of extracted receipt items")
+    ocrRawText: str = Field(default="", description="Complete raw OCR text")
+    ocrConfidence: float = Field(default=0.0, description="Average confidence score across all detected text")
+
+
+class ErrorResponse(BaseModel):
+    """Standardized error response structure"""
+    error: str = Field(..., description="Error message")
+    code: str = Field(default="OCR_ERROR", description="Error code")
+    details: Optional[dict] = Field(default=None, description="Additional error details")
+
+
+class HealthResponse(BaseModel):
+    """Health check response"""
+    status: str = Field(default="healthy", description="Service health status")
+    service: str = Field(default="ai-service", description="Service name")
+    version: str = Field(default="1.0.0", description="Service version")
+
+
+
+================================================
+FILE: ai-service/ocr_service.py
+================================================
+import re
+import logging
+from datetime import datetime
+from typing import List, Tuple, Optional
+from paddleocr import PaddleOCR
+from models import OcrExtractedData, ReceiptItemDTO
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Type alias: (center_x, center_y, text, confidence, line_height)
+# ---------------------------------------------------------------------------
+Block = Tuple[float, float, str, float, float]
+
+
+class OCRService:
+    """PaddleOCR integration service with receipt parsing logic."""
+
+    def __init__(self):
+        self.ocr = PaddleOCR(
+            use_angle_cls=True,
+            lang='en',
+            det_db_score_mode='slow',   # better recall on dense receipt text
+            rec_batch_num=6,
+        )
+
+    # -----------------------------------------------------------------------
+    # Public interface
+    # -----------------------------------------------------------------------
+
+    def extract_text_from_image(self, image_path: str) -> List[List]:
+        try:
+            result = self.ocr.ocr(image_path, cls=True)
+            if not result or not result[0]:
+                logger.warning("No text detected in image")
+                return [[]]
+            return result
+        except Exception as e:
+            logger.error(f"PaddleOCR processing failed: {str(e)}")
+            raise Exception(f"OCR processing failed: {str(e)}")
+
+    def parse_receipt_data(self, paddleocr_result: List[List]) -> OcrExtractedData:
+        try:
+            if not paddleocr_result or not paddleocr_result[0]:
+                return self._create_empty_receipt_data()
+
+            # ------------------------------------------------------------------
+            # Step 1 — Convert raw PaddleOCR detections to Block tuples.
+            #          Each Block: (cx, cy, text, confidence, height)
+            # ------------------------------------------------------------------
+            blocks: List[Block] = []
+            for det in paddleocr_result[0]:
+                if not det or len(det) < 2:
+                    continue
+                bbox, (text, conf) = det[0], det[1]
+                text = text.strip()
+                if not text:
+                    continue
+                ys = [pt[1] for pt in bbox]
+                xs = [pt[0] for pt in bbox]
+                cx = (min(xs) + max(xs)) / 2
+                cy = (min(ys) + max(ys)) / 2
+                height = max(ys) - min(ys)
+                blocks.append((cx, cy, text, conf, height))
+
+            if not blocks:
+                return self._create_empty_receipt_data()
+
+            # ------------------------------------------------------------------
+            # Step 2 — Cluster blocks into horizontal rows by Y proximity.
+            #
+            # PaddleOCR returns each table cell as a separate detection, e.g.:
+            #   "Tandoori chicken"  cy=210
+            #   "1"                 cy=212
+            #   "295.00"            cy=211
+            #   "309.75"            cy=210
+            #
+            # Grouping them by Y re-assembles the table row:
+            #   "Tandoori chicken | 1 | 295.00 | 309.75"
+            # ------------------------------------------------------------------
+            rows: List[List[Block]] = self._group_blocks_into_rows(blocks)
+
+            # ------------------------------------------------------------------
+            # Step 3 — Within each row sort left→right and join with TAB so
+            #          column boundaries are visible to downstream parsers.
+            # ------------------------------------------------------------------
+            row_texts: List[str] = []
+            for row in rows:
+                row_sorted = sorted(row, key=lambda b: b[0])   # sort by cx
+                row_texts.append("\t".join(b[2] for b in row_sorted))
+
+            # Flat list of tokens (Y-then-X order) for merchant/total/date
+            flat_lines: List[str] = [
+                b[2] for b in sorted(blocks, key=lambda b: (b[1], b[0]))
+            ]
+            all_text = " ".join(flat_lines)
+            all_confidences = [b[3] for b in blocks]
+
+            merchant = self._extract_merchant(flat_lines)
+            total    = self._extract_total(flat_lines)
+            date     = self._extract_date(flat_lines)
+            items    = self._extract_items(row_texts, total)
+            avg_conf = sum(all_confidences) / len(all_confidences)
+
+            logger.info(
+                f"Parsed — merchant='{merchant}' total={total} "
+                f"date={date} items={len(items)} conf={avg_conf:.3f}"
+            )
+
+            return OcrExtractedData(
+                merchantName=merchant,
+                totalAmount=total or 0.0,
+                receiptDate=date,
+                items=items,
+                ocrRawText=all_text,
+                ocrConfidence=round(avg_conf, 3),
+            )
+
+        except Exception as e:
+            logger.error(f"Receipt parsing failed: {str(e)}")
+            return self._create_empty_receipt_data()
+
+    # -----------------------------------------------------------------------
+    # Row grouping
+    # -----------------------------------------------------------------------
+
+    def _group_blocks_into_rows(self, blocks: List[Block]) -> List[List[Block]]:
+        """
+        Cluster OCR blocks into horizontal rows using Y-center proximity.
+
+        Tolerance = 60 % of the median block height.  Two blocks are in the
+        same row when |cy_a - cy_b| <= tolerance.
+        """
+        sorted_blocks = sorted(blocks, key=lambda b: b[1])
+
+        heights = [b[4] for b in sorted_blocks if b[4] > 0]
+        median_h = sorted(heights)[len(heights) // 2] if heights else 30.0
+        tolerance = median_h * 0.6
+
+        rows: List[List[Block]] = []
+        current_row: List[Block] = [sorted_blocks[0]]
+
+        for block in sorted_blocks[1:]:
+            row_cy = sum(b[1] for b in current_row) / len(current_row)
+            if abs(block[1] - row_cy) <= tolerance:
+                current_row.append(block)
+            else:
+                rows.append(current_row)
+                current_row = [block]
+
+        rows.append(current_row)
+        return rows
+
+    # -----------------------------------------------------------------------
+    # Merchant
+    # -----------------------------------------------------------------------
+
+    def _extract_merchant(self, flat_lines: List[str]) -> str:
+        for line in flat_lines:
+            s = line.strip()
+            if s and not self._is_date_or_amount(s) and not self._is_header_noise(s):
+                return s
+        return ""
+
+    # -----------------------------------------------------------------------
+    # Total amount
+    # -----------------------------------------------------------------------
+
+    def _extract_total(self, flat_lines: List[str]) -> Optional[float]:
+        total_re = re.compile(
+            r'\bTotal\b[^0-9₹$]*[₹$]?\s*([\d,]+\.?\d*)',
+            re.IGNORECASE
+        )
+        skip_re = re.compile(
+            r'\b(sub.?total|cgst|sgst|vat|s\.tax|service.tax)\b',
+            re.IGNORECASE
+        )
+
+        # Pass 1 — explicit "Total" keyword, use the capture group
+        for line in flat_lines:
+            if skip_re.search(line):
+                continue
+            m = total_re.search(line)
+            if m:
+                try:
+                    v = float(m.group(1).replace(',', ''))
+                    if 0 < v < 10_000_000:
+                        return v
+                except ValueError:
+                    pass
+
+        # Pass 2 — largest plausible number on a non-header/non-tax line
+        best: Optional[float] = None
+        for line in flat_lines:
+            if self._is_header_noise(line) or skip_re.search(line):
+                continue
+            for token in re.findall(r'[\d,]+\.?\d*', line):
+                try:
+                    v = float(token.replace(',', ''))
+                    if 0 < v < 10_000_000 and (best is None or v > best):
+                        best = v
+                except ValueError:
+                    pass
+        return best
+
+    # -----------------------------------------------------------------------
+    # Date
+    # -----------------------------------------------------------------------
+
+    def _extract_date(self, flat_lines: List[str]) -> Optional[str]:
+        patterns = [
+            r'(\d{1,2}[-/]\s*[A-Za-z]{3,9}[-/]\s*\d{2,4})',
+            r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
+            r'(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})',
+            r'(\d{4}[/-]\d{1,2}[/-]\d{1,2})',
+        ]
+        for line in flat_lines:
+            for pat in patterns:
+                m = re.search(pat, line)
+                if m:
+                    result = self._normalize_date(m.group(1).strip())
+                    if result:
+                        return result
+        return None
+
+    def _normalize_date(self, date_str: str) -> Optional[str]:
+        date_str = re.sub(r'\s+', ' ', date_str).strip()
+        formats = [
+            '%d-%b-%y', '%d/%b/%y', '%d %b %y',   # 2-digit year first
+            '%d-%m-%y', '%d/%m/%y',
+            '%d-%b-%Y', '%d/%b/%Y', '%d %b %Y',   # 4-digit year
+            '%d-%m-%Y', '%d/%m/%Y',
+            '%Y-%m-%d', '%Y/%m/%d',
+        ]
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_str, fmt).strftime('%Y-%m-%d')
+            except ValueError:
+                continue
+        logger.warning(f"Could not normalise date: '{date_str}'")
+        return None
+
+    # -----------------------------------------------------------------------
+    # Item extraction — operates on spatially-reconstructed row strings
+    # -----------------------------------------------------------------------
+
+    def _extract_items(
+        self, row_texts: List[str], total_amount: Optional[float]
+    ) -> List[ReceiptItemDTO]:
+        """
+        Parse items from tab-delimited row strings.
+
+        Each row_text looks like (after spatial grouping + left→right sort):
+            "Tandoori chicken\t1\t295.00\t309.75"
+
+        Supported layouts:
+          A) name  qty  unit_price  total_price   (4-column)
+          B) name  unit_price  total_price         (3-column, qty=1)
+          C) name  total_price                     (2-column, qty=1)
+        """
+        items: List[ReceiptItemDTO] = []
+        for row in row_texts:
+            if self._should_skip_row(row, total_amount):
+                continue
+            cols = [c.strip() for c in re.split(r'\t|  +', row) if c.strip()]
+            if len(cols) < 2:
+                continue
+            item = self._parse_item_columns(cols)
+            if item:
+                items.append(item)
+        return items
+
+    def _parse_item_columns(self, cols: List[str]) -> Optional[ReceiptItemDTO]:
+        """
+        Interpret a column list as a receipt line item.
+
+        Walk right-to-left collecting numeric tokens; the rest is the name.
+        Map trailing numbers to (total), (unit, total), or (qty, unit, total).
+        """
+        amount_re = re.compile(r'^[\d,]+\.\d{1,2}$')   # must have decimal
+        qty_re    = re.compile(r'^\d+(\.\d+)?$')         # integer or decimal
+
+        numeric_suffix: List[str] = []
+        name_end_idx = 0
+
+        for i in range(len(cols) - 1, -1, -1):
+            cleaned = cols[i].replace(',', '')
+            is_amount = amount_re.match(cleaned)
+            is_qty    = qty_re.match(cleaned) and len(numeric_suffix) < 3
+
+            if is_amount or is_qty:
+                numeric_suffix.insert(0, cleaned)
+            else:
+                name_end_idx = i + 1
+                break
+
+        if not numeric_suffix:
+            return None
+
+        name = " ".join(cols[:name_end_idx]).strip()
+        if len(name) < 2:
+            return None
+
+        try:
+            if len(numeric_suffix) >= 3:
+                qty         = float(numeric_suffix[0])
+                unit_price  = float(numeric_suffix[1])
+                total_price = float(numeric_suffix[2])
+            elif len(numeric_suffix) == 2:
+                qty         = 1.0
+                unit_price  = float(numeric_suffix[0])
+                total_price = float(numeric_suffix[1])
+            else:
+                qty         = 1.0
+                total_price = float(numeric_suffix[0])
+                unit_price  = total_price
+
+            if not (0 < total_price < 100_000):
+                return None
+
+            return ReceiptItemDTO(
+                name=name,
+                quantity=qty,
+                unitPrice=unit_price,
+                totalPrice=total_price,
+            )
+        except ValueError:
+            return None
+
+    # -----------------------------------------------------------------------
+    # Skip / noise helpers
+    # -----------------------------------------------------------------------
+
+    def _should_skip_row(self, row: str, total_amount: Optional[float]) -> bool:
+        row_lower = row.lower().strip()
+
+        if re.search(
+            r'\b(grand.?total|sub.?total|cgst|sgst|vat|s\.tax|service.tax)\b',
+            row_lower
+        ):
+            return True
+        if re.match(r'^\s*total[\s\t:]+', row_lower):
+            return True
+        if re.search(r'\b(qty|quantity|rate|item|description)\b', row_lower):
+            return True
+        # Pure numeric / symbol rows
+        if re.match(r'^[\t\s₹$\d,.%-]+$', row):
+            return True
+        if self._is_header_noise(row):
+            return True
+        if len(row.strip()) < 3:
+            return True
+        return False
+
+    def _is_header_noise(self, line: str) -> bool:
+        noise = [
+            r'\bGSTIN\b',
+            r'\bInvoice\s*(No|Number|Date)\b',
+            r'\bIN\d{9,}\b',
+            r'\bPh(one)?\.?\s*(No\.?|#)?\s*[:\.]',
+            r'\bThanks?\b',
+            r'\bVisit\b',
+            r'^\d{3,6}[-\s]\d{6,}',
+            r'\bPrivate\s+Limited\b',
+            r'\bPvt\.?\s*Ltd\.?\b',
+            r'\bODVJH\b',
+            r'\bFaridabad\b',
+            r'\bSector\b',
+        ]
+        for pat in noise:
+            if re.search(pat, line, re.IGNORECASE):
+                return True
+        return False
+
+    def _is_date_or_amount(self, line: str) -> bool:
+        date_pats = [
+            r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}',
+            r'\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}',
+            r'\d{4}[/-]\d{1,2}[/-]\d{1,2}',
+            r'\d{1,2}[-/][A-Za-z]{3,9}[-/]\d{2,4}',
+        ]
+        for p in date_pats:
+            if re.search(p, line):
+                return True
+        if re.match(r'^[₹$]?\s*[\d,]+\.?\d*\s*$', line.strip()):
+            return True
+        return False
+
+    def _create_empty_receipt_data(self) -> OcrExtractedData:
+        return OcrExtractedData(
+            merchantName="",
+            totalAmount=0.0,
+            receiptDate=None,
+            items=[],
+            ocrRawText="",
+            ocrConfidence=0.0,
+        )
+
+
+# Singleton instance
+ocr_service = OCRService()
+
+
+================================================
+FILE: ai-service/requirements.txt
+================================================
+# FastAPI and ASGI server
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# OCR Processing — pinned to v2 to avoid PaddlePaddle v3 oneDNN/PIR issues
+paddleocr==2.9.1
+paddlepaddle==2.6.2
+
+# Data validation and serialization
+pydantic>=2.5.0
+
+# HTTP client for downloads
+httpx>=0.25.0
+
+# File handling
+python-multipart>=0.0.6
+
+# Logging and utilities
+structlog>=23.2.0
+
+# Image processing (for format validation)
+Pillow>=10.0.0
+
+# Additional utilities
+python-dateutil>=2.8.2
+
+setup
+
+
+================================================
+FILE: core-service/mvnw
+================================================
+#!/bin/sh
+# ----------------------------------------------------------------------------
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+# ----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
+# Apache Maven Wrapper startup batch script, version 3.3.4
+#
+# Optional ENV vars
+# -----------------
+#   JAVA_HOME - location of a JDK home dir, required when download maven via java source
+#   MVNW_REPOURL - repo url base for downloading maven distribution
+#   MVNW_USERNAME/MVNW_PASSWORD - user and password for downloading maven
+#   MVNW_VERBOSE - true: enable verbose log; debug: trace the mvnw script; others: silence the output
+# ----------------------------------------------------------------------------
+
+set -euf
+[ "${MVNW_VERBOSE-}" != debug ] || set -x
+
+# OS specific support.
+native_path() { printf %s\\n "$1"; }
+case "$(uname)" in
+CYGWIN* | MINGW*)
+  [ -z "${JAVA_HOME-}" ] || JAVA_HOME="$(cygpath --unix "$JAVA_HOME")"
+  native_path() { cygpath --path --windows "$1"; }
+  ;;
+esac
+
+# set JAVACMD and JAVACCMD
+set_java_home() {
+  # For Cygwin and MinGW, ensure paths are in Unix format before anything is touched
+  if [ -n "${JAVA_HOME-}" ]; then
+    if [ -x "$JAVA_HOME/jre/sh/java" ]; then
+      # IBM's JDK on AIX uses strange locations for the executables
+      JAVACMD="$JAVA_HOME/jre/sh/java"
+      JAVACCMD="$JAVA_HOME/jre/sh/javac"
+    else
+      JAVACMD="$JAVA_HOME/bin/java"
+      JAVACCMD="$JAVA_HOME/bin/javac"
+
+      if [ ! -x "$JAVACMD" ] || [ ! -x "$JAVACCMD" ]; then
+        echo "The JAVA_HOME environment variable is not defined correctly, so mvnw cannot run." >&2
+        echo "JAVA_HOME is set to \"$JAVA_HOME\", but \"\$JAVA_HOME/bin/java\" or \"\$JAVA_HOME/bin/javac\" does not exist." >&2
+        return 1
+      fi
+    fi
+  else
+    JAVACMD="$(
+      'set' +e
+      'unset' -f command 2>/dev/null
+      'command' -v java
+    )" || :
+    JAVACCMD="$(
+      'set' +e
+      'unset' -f command 2>/dev/null
+      'command' -v javac
+    )" || :
+
+    if [ ! -x "${JAVACMD-}" ] || [ ! -x "${JAVACCMD-}" ]; then
+      echo "The java/javac command does not exist in PATH nor is JAVA_HOME set, so mvnw cannot run." >&2
+      return 1
+    fi
+  fi
+}
+
+# hash string like Java String::hashCode
+hash_string() {
+  str="${1:-}" h=0
+  while [ -n "$str" ]; do
+    char="${str%"${str#?}"}"
+    h=$(((h * 31 + $(LC_CTYPE=C printf %d "'$char")) % 4294967296))
+    str="${str#?}"
+  done
+  printf %x\\n $h
+}
+
+verbose() { :; }
+[ "${MVNW_VERBOSE-}" != true ] || verbose() { printf %s\\n "${1-}"; }
+
+die() {
+  printf %s\\n "$1" >&2
+  exit 1
+}
+
+trim() {
+  # MWRAPPER-139:
+  #   Trims trailing and leading whitespace, carriage returns, tabs, and linefeeds.
+  #   Needed for removing poorly interpreted newline sequences when running in more
+  #   exotic environments such as mingw bash on Windows.
+  printf "%s" "${1}" | tr -d '[:space:]'
+}
+
+scriptDir="$(dirname "$0")"
+scriptName="$(basename "$0")"
+
+# parse distributionUrl and optional distributionSha256Sum, requires .mvn/wrapper/maven-wrapper.properties
+while IFS="=" read -r key value; do
+  case "${key-}" in
+  distributionUrl) distributionUrl=$(trim "${value-}") ;;
+  distributionSha256Sum) distributionSha256Sum=$(trim "${value-}") ;;
+  esac
+done <"$scriptDir/.mvn/wrapper/maven-wrapper.properties"
+[ -n "${distributionUrl-}" ] || die "cannot read distributionUrl property in $scriptDir/.mvn/wrapper/maven-wrapper.properties"
+
+case "${distributionUrl##*/}" in
+maven-mvnd-*bin.*)
+  MVN_CMD=mvnd.sh _MVNW_REPO_PATTERN=/maven/mvnd/
+  case "${PROCESSOR_ARCHITECTURE-}${PROCESSOR_ARCHITEW6432-}:$(uname -a)" in
+  *AMD64:CYGWIN* | *AMD64:MINGW*) distributionPlatform=windows-amd64 ;;
+  :Darwin*x86_64) distributionPlatform=darwin-amd64 ;;
+  :Darwin*arm64) distributionPlatform=darwin-aarch64 ;;
+  :Linux*x86_64*) distributionPlatform=linux-amd64 ;;
+  *)
+    echo "Cannot detect native platform for mvnd on $(uname)-$(uname -m), use pure java version" >&2
+    distributionPlatform=linux-amd64
+    ;;
+  esac
+  distributionUrl="${distributionUrl%-bin.*}-$distributionPlatform.zip"
+  ;;
+maven-mvnd-*) MVN_CMD=mvnd.sh _MVNW_REPO_PATTERN=/maven/mvnd/ ;;
+*) MVN_CMD="mvn${scriptName#mvnw}" _MVNW_REPO_PATTERN=/org/apache/maven/ ;;
+esac
+
+# apply MVNW_REPOURL and calculate MAVEN_HOME
+# maven home pattern: ~/.m2/wrapper/dists/{apache-maven-<version>,maven-mvnd-<version>-<platform>}/<hash>
+[ -z "${MVNW_REPOURL-}" ] || distributionUrl="$MVNW_REPOURL$_MVNW_REPO_PATTERN${distributionUrl#*"$_MVNW_REPO_PATTERN"}"
+distributionUrlName="${distributionUrl##*/}"
+distributionUrlNameMain="${distributionUrlName%.*}"
+distributionUrlNameMain="${distributionUrlNameMain%-bin}"
+MAVEN_USER_HOME="${MAVEN_USER_HOME:-${HOME}/.m2}"
+MAVEN_HOME="${MAVEN_USER_HOME}/wrapper/dists/${distributionUrlNameMain-}/$(hash_string "$distributionUrl")"
+
+exec_maven() {
+  unset MVNW_VERBOSE MVNW_USERNAME MVNW_PASSWORD MVNW_REPOURL || :
+  exec "$MAVEN_HOME/bin/$MVN_CMD" "$@" || die "cannot exec $MAVEN_HOME/bin/$MVN_CMD"
+}
+
+if [ -d "$MAVEN_HOME" ]; then
+  verbose "found existing MAVEN_HOME at $MAVEN_HOME"
+  exec_maven "$@"
+fi
+
+case "${distributionUrl-}" in
+*?-bin.zip | *?maven-mvnd-?*-?*.zip) ;;
+*) die "distributionUrl is not valid, must match *-bin.zip or maven-mvnd-*.zip, but found '${distributionUrl-}'" ;;
+esac
+
+# prepare tmp dir
+if TMP_DOWNLOAD_DIR="$(mktemp -d)" && [ -d "$TMP_DOWNLOAD_DIR" ]; then
+  clean() { rm -rf -- "$TMP_DOWNLOAD_DIR"; }
+  trap clean HUP INT TERM EXIT
+else
+  die "cannot create temp dir"
+fi
+
+mkdir -p -- "${MAVEN_HOME%/*}"
+
+# Download and Install Apache Maven
+verbose "Couldn't find MAVEN_HOME, downloading and installing it ..."
+verbose "Downloading from: $distributionUrl"
+verbose "Downloading to: $TMP_DOWNLOAD_DIR/$distributionUrlName"
+
+# select .zip or .tar.gz
+if ! command -v unzip >/dev/null; then
+  distributionUrl="${distributionUrl%.zip}.tar.gz"
+  distributionUrlName="${distributionUrl##*/}"
+fi
+
+# verbose opt
+__MVNW_QUIET_WGET=--quiet __MVNW_QUIET_CURL=--silent __MVNW_QUIET_UNZIP=-q __MVNW_QUIET_TAR=''
+[ "${MVNW_VERBOSE-}" != true ] || __MVNW_QUIET_WGET='' __MVNW_QUIET_CURL='' __MVNW_QUIET_UNZIP='' __MVNW_QUIET_TAR=v
+
+# normalize http auth
+case "${MVNW_PASSWORD:+has-password}" in
+'') MVNW_USERNAME='' MVNW_PASSWORD='' ;;
+has-password) [ -n "${MVNW_USERNAME-}" ] || MVNW_USERNAME='' MVNW_PASSWORD='' ;;
+esac
+
+if [ -z "${MVNW_USERNAME-}" ] && command -v wget >/dev/null; then
+  verbose "Found wget ... using wget"
+  wget ${__MVNW_QUIET_WGET:+"$__MVNW_QUIET_WGET"} "$distributionUrl" -O "$TMP_DOWNLOAD_DIR/$distributionUrlName" || die "wget: Failed to fetch $distributionUrl"
+elif [ -z "${MVNW_USERNAME-}" ] && command -v curl >/dev/null; then
+  verbose "Found curl ... using curl"
+  curl ${__MVNW_QUIET_CURL:+"$__MVNW_QUIET_CURL"} -f -L -o "$TMP_DOWNLOAD_DIR/$distributionUrlName" "$distributionUrl" || die "curl: Failed to fetch $distributionUrl"
+elif set_java_home; then
+  verbose "Falling back to use Java to download"
+  javaSource="$TMP_DOWNLOAD_DIR/Downloader.java"
+  targetZip="$TMP_DOWNLOAD_DIR/$distributionUrlName"
+  cat >"$javaSource" <<-END
+	public class Downloader extends java.net.Authenticator
+	{
+	  protected java.net.PasswordAuthentication getPasswordAuthentication()
+	  {
+	    return new java.net.PasswordAuthentication( System.getenv( "MVNW_USERNAME" ), System.getenv( "MVNW_PASSWORD" ).toCharArray() );
+	  }
+	  public static void main( String[] args ) throws Exception
+	  {
+	    setDefault( new Downloader() );
+	    java.nio.file.Files.copy( java.net.URI.create( args[0] ).toURL().openStream(), java.nio.file.Paths.get( args[1] ).toAbsolutePath().normalize() );
+	  }
+	}
+	END
+  # For Cygwin/MinGW, switch paths to Windows format before running javac and java
+  verbose " - Compiling Downloader.java ..."
+  "$(native_path "$JAVACCMD")" "$(native_path "$javaSource")" || die "Failed to compile Downloader.java"
+  verbose " - Running Downloader.java ..."
+  "$(native_path "$JAVACMD")" -cp "$(native_path "$TMP_DOWNLOAD_DIR")" Downloader "$distributionUrl" "$(native_path "$targetZip")"
+fi
+
+# If specified, validate the SHA-256 sum of the Maven distribution zip file
+if [ -n "${distributionSha256Sum-}" ]; then
+  distributionSha256Result=false
+  if [ "$MVN_CMD" = mvnd.sh ]; then
+    echo "Checksum validation is not supported for maven-mvnd." >&2
+    echo "Please disable validation by removing 'distributionSha256Sum' from your maven-wrapper.properties." >&2
+    exit 1
+  elif command -v sha256sum >/dev/null; then
+    if echo "$distributionSha256Sum  $TMP_DOWNLOAD_DIR/$distributionUrlName" | sha256sum -c - >/dev/null 2>&1; then
+      distributionSha256Result=true
+    fi
+  elif command -v shasum >/dev/null; then
+    if echo "$distributionSha256Sum  $TMP_DOWNLOAD_DIR/$distributionUrlName" | shasum -a 256 -c >/dev/null 2>&1; then
+      distributionSha256Result=true
+    fi
+  else
+    echo "Checksum validation was requested but neither 'sha256sum' or 'shasum' are available." >&2
+    echo "Please install either command, or disable validation by removing 'distributionSha256Sum' from your maven-wrapper.properties." >&2
+    exit 1
+  fi
+  if [ $distributionSha256Result = false ]; then
+    echo "Error: Failed to validate Maven distribution SHA-256, your Maven distribution might be compromised." >&2
+    echo "If you updated your Maven version, you need to update the specified distributionSha256Sum property." >&2
+    exit 1
+  fi
+fi
+
+# unzip and move
+if command -v unzip >/dev/null; then
+  unzip ${__MVNW_QUIET_UNZIP:+"$__MVNW_QUIET_UNZIP"} "$TMP_DOWNLOAD_DIR/$distributionUrlName" -d "$TMP_DOWNLOAD_DIR" || die "failed to unzip"
+else
+  tar xzf${__MVNW_QUIET_TAR:+"$__MVNW_QUIET_TAR"} "$TMP_DOWNLOAD_DIR/$distributionUrlName" -C "$TMP_DOWNLOAD_DIR" || die "failed to untar"
+fi
+
+# Find the actual extracted directory name (handles snapshots where filename != directory name)
+actualDistributionDir=""
+
+# First try the expected directory name (for regular distributions)
+if [ -d "$TMP_DOWNLOAD_DIR/$distributionUrlNameMain" ]; then
+  if [ -f "$TMP_DOWNLOAD_DIR/$distributionUrlNameMain/bin/$MVN_CMD" ]; then
+    actualDistributionDir="$distributionUrlNameMain"
+  fi
+fi
+
+# If not found, search for any directory with the Maven executable (for snapshots)
+if [ -z "$actualDistributionDir" ]; then
+  # enable globbing to iterate over items
+  set +f
+  for dir in "$TMP_DOWNLOAD_DIR"/*; do
+    if [ -d "$dir" ]; then
+      if [ -f "$dir/bin/$MVN_CMD" ]; then
+        actualDistributionDir="$(basename "$dir")"
+        break
+      fi
+    fi
+  done
+  set -f
+fi
+
+if [ -z "$actualDistributionDir" ]; then
+  verbose "Contents of $TMP_DOWNLOAD_DIR:"
+  verbose "$(ls -la "$TMP_DOWNLOAD_DIR")"
+  die "Could not find Maven distribution directory in extracted archive"
+fi
+
+verbose "Found extracted Maven distribution directory: $actualDistributionDir"
+printf %s\\n "$distributionUrl" >"$TMP_DOWNLOAD_DIR/$actualDistributionDir/mvnw.url"
+mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_HOME" ] || die "fail to move MAVEN_HOME"
+
+clean || :
+exec_maven "$@"
+
+
+
+================================================
+FILE: core-service/mvnw.cmd
+================================================
+<# : batch portion
+@REM ----------------------------------------------------------------------------
+@REM Licensed to the Apache Software Foundation (ASF) under one
+@REM or more contributor license agreements.  See the NOTICE file
+@REM distributed with this work for additional information
+@REM regarding copyright ownership.  The ASF licenses this file
+@REM to you under the Apache License, Version 2.0 (the
+@REM "License"); you may not use this file except in compliance
+@REM with the License.  You may obtain a copy of the License at
+@REM
+@REM    http://www.apache.org/licenses/LICENSE-2.0
+@REM
+@REM Unless required by applicable law or agreed to in writing,
+@REM software distributed under the License is distributed on an
+@REM "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+@REM KIND, either express or implied.  See the License for the
+@REM specific language governing permissions and limitations
+@REM under the License.
+@REM ----------------------------------------------------------------------------
+
+@REM ----------------------------------------------------------------------------
+@REM Apache Maven Wrapper startup batch script, version 3.3.4
+@REM
+@REM Optional ENV vars
+@REM   MVNW_REPOURL - repo url base for downloading maven distribution
+@REM   MVNW_USERNAME/MVNW_PASSWORD - user and password for downloading maven
+@REM   MVNW_VERBOSE - true: enable verbose log; others: silence the output
+@REM ----------------------------------------------------------------------------
+
+@IF "%__MVNW_ARG0_NAME__%"=="" (SET __MVNW_ARG0_NAME__=%~nx0)
+@SET __MVNW_CMD__=
+@SET __MVNW_ERROR__=
+@SET __MVNW_PSMODULEP_SAVE=%PSModulePath%
+@SET PSModulePath=
+@FOR /F "usebackq tokens=1* delims==" %%A IN (`powershell -noprofile "& {$scriptDir='%~dp0'; $script='%__MVNW_ARG0_NAME__%'; icm -ScriptBlock ([Scriptblock]::Create((Get-Content -Raw '%~f0'))) -NoNewScope}"`) DO @(
+  IF "%%A"=="MVN_CMD" (set __MVNW_CMD__=%%B) ELSE IF "%%B"=="" (echo %%A) ELSE (echo %%A=%%B)
+)
+@SET PSModulePath=%__MVNW_PSMODULEP_SAVE%
+@SET __MVNW_PSMODULEP_SAVE=
+@SET __MVNW_ARG0_NAME__=
+@SET MVNW_USERNAME=
+@SET MVNW_PASSWORD=
+@IF NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
+@echo Cannot start maven from wrapper >&2 && exit /b 1
+@GOTO :EOF
+: end batch / begin powershell #>
+
+$ErrorActionPreference = "Stop"
+if ($env:MVNW_VERBOSE -eq "true") {
+  $VerbosePreference = "Continue"
+}
+
+# calculate distributionUrl, requires .mvn/wrapper/maven-wrapper.properties
+$distributionUrl = (Get-Content -Raw "$scriptDir/.mvn/wrapper/maven-wrapper.properties" | ConvertFrom-StringData).distributionUrl
+if (!$distributionUrl) {
+  Write-Error "cannot read distributionUrl property in $scriptDir/.mvn/wrapper/maven-wrapper.properties"
+}
+
+switch -wildcard -casesensitive ( $($distributionUrl -replace '^.*/','') ) {
+  "maven-mvnd-*" {
+    $USE_MVND = $true
+    $distributionUrl = $distributionUrl -replace '-bin\.[^.]*$',"-windows-amd64.zip"
+    $MVN_CMD = "mvnd.cmd"
+    break
+  }
+  default {
+    $USE_MVND = $false
+    $MVN_CMD = $script -replace '^mvnw','mvn'
+    break
+  }
+}
+
+# apply MVNW_REPOURL and calculate MAVEN_HOME
+# maven home pattern: ~/.m2/wrapper/dists/{apache-maven-<version>,maven-mvnd-<version>-<platform>}/<hash>
+if ($env:MVNW_REPOURL) {
+  $MVNW_REPO_PATTERN = if ($USE_MVND -eq $False) { "/org/apache/maven/" } else { "/maven/mvnd/" }
+  $distributionUrl = "$env:MVNW_REPOURL$MVNW_REPO_PATTERN$($distributionUrl -replace "^.*$MVNW_REPO_PATTERN",'')"
+}
+$distributionUrlName = $distributionUrl -replace '^.*/',''
+$distributionUrlNameMain = $distributionUrlName -replace '\.[^.]*$','' -replace '-bin$',''
+
+$MAVEN_M2_PATH = "$HOME/.m2"
+if ($env:MAVEN_USER_HOME) {
+  $MAVEN_M2_PATH = "$env:MAVEN_USER_HOME"
+}
+
+if (-not (Test-Path -Path $MAVEN_M2_PATH)) {
+    New-Item -Path $MAVEN_M2_PATH -ItemType Directory | Out-Null
+}
+
+$MAVEN_WRAPPER_DISTS = $null
+if ((Get-Item $MAVEN_M2_PATH).Target[0] -eq $null) {
+  $MAVEN_WRAPPER_DISTS = "$MAVEN_M2_PATH/wrapper/dists"
+} else {
+  $MAVEN_WRAPPER_DISTS = (Get-Item $MAVEN_M2_PATH).Target[0] + "/wrapper/dists"
+}
+
+$MAVEN_HOME_PARENT = "$MAVEN_WRAPPER_DISTS/$distributionUrlNameMain"
+$MAVEN_HOME_NAME = ([System.Security.Cryptography.SHA256]::Create().ComputeHash([byte[]][char[]]$distributionUrl) | ForEach-Object {$_.ToString("x2")}) -join ''
+$MAVEN_HOME = "$MAVEN_HOME_PARENT/$MAVEN_HOME_NAME"
+
+if (Test-Path -Path "$MAVEN_HOME" -PathType Container) {
+  Write-Verbose "found existing MAVEN_HOME at $MAVEN_HOME"
+  Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+  exit $?
+}
+
+if (! $distributionUrlNameMain -or ($distributionUrlName -eq $distributionUrlNameMain)) {
+  Write-Error "distributionUrl is not valid, must end with *-bin.zip, but found $distributionUrl"
+}
+
+# prepare tmp dir
+$TMP_DOWNLOAD_DIR_HOLDER = New-TemporaryFile
+$TMP_DOWNLOAD_DIR = New-Item -Itemtype Directory -Path "$TMP_DOWNLOAD_DIR_HOLDER.dir"
+$TMP_DOWNLOAD_DIR_HOLDER.Delete() | Out-Null
+trap {
+  if ($TMP_DOWNLOAD_DIR.Exists) {
+    try { Remove-Item $TMP_DOWNLOAD_DIR -Recurse -Force | Out-Null }
+    catch { Write-Warning "Cannot remove $TMP_DOWNLOAD_DIR" }
+  }
+}
+
+New-Item -Itemtype Directory -Path "$MAVEN_HOME_PARENT" -Force | Out-Null
+
+# Download and Install Apache Maven
+Write-Verbose "Couldn't find MAVEN_HOME, downloading and installing it ..."
+Write-Verbose "Downloading from: $distributionUrl"
+Write-Verbose "Downloading to: $TMP_DOWNLOAD_DIR/$distributionUrlName"
+
+$webclient = New-Object System.Net.WebClient
+if ($env:MVNW_USERNAME -and $env:MVNW_PASSWORD) {
+  $webclient.Credentials = New-Object System.Net.NetworkCredential($env:MVNW_USERNAME, $env:MVNW_PASSWORD)
+}
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$webclient.DownloadFile($distributionUrl, "$TMP_DOWNLOAD_DIR/$distributionUrlName") | Out-Null
+
+# If specified, validate the SHA-256 sum of the Maven distribution zip file
+$distributionSha256Sum = (Get-Content -Raw "$scriptDir/.mvn/wrapper/maven-wrapper.properties" | ConvertFrom-StringData).distributionSha256Sum
+if ($distributionSha256Sum) {
+  if ($USE_MVND) {
+    Write-Error "Checksum validation is not supported for maven-mvnd. `nPlease disable validation by removing 'distributionSha256Sum' from your maven-wrapper.properties."
+  }
+  Import-Module $PSHOME\Modules\Microsoft.PowerShell.Utility -Function Get-FileHash
+  if ((Get-FileHash "$TMP_DOWNLOAD_DIR/$distributionUrlName" -Algorithm SHA256).Hash.ToLower() -ne $distributionSha256Sum) {
+    Write-Error "Error: Failed to validate Maven distribution SHA-256, your Maven distribution might be compromised. If you updated your Maven version, you need to update the specified distributionSha256Sum property."
+  }
+}
+
+# unzip and move
+Expand-Archive "$TMP_DOWNLOAD_DIR/$distributionUrlName" -DestinationPath "$TMP_DOWNLOAD_DIR" | Out-Null
+
+# Find the actual extracted directory name (handles snapshots where filename != directory name)
+$actualDistributionDir = ""
+
+# First try the expected directory name (for regular distributions)
+$expectedPath = Join-Path "$TMP_DOWNLOAD_DIR" "$distributionUrlNameMain"
+$expectedMvnPath = Join-Path "$expectedPath" "bin/$MVN_CMD"
+if ((Test-Path -Path $expectedPath -PathType Container) -and (Test-Path -Path $expectedMvnPath -PathType Leaf)) {
+  $actualDistributionDir = $distributionUrlNameMain
+}
+
+# If not found, search for any directory with the Maven executable (for snapshots)
+if (!$actualDistributionDir) {
+  Get-ChildItem -Path "$TMP_DOWNLOAD_DIR" -Directory | ForEach-Object {
+    $testPath = Join-Path $_.FullName "bin/$MVN_CMD"
+    if (Test-Path -Path $testPath -PathType Leaf) {
+      $actualDistributionDir = $_.Name
+    }
+  }
+}
+
+if (!$actualDistributionDir) {
+  Write-Error "Could not find Maven distribution directory in extracted archive"
+}
+
+Write-Verbose "Found extracted Maven distribution directory: $actualDistributionDir"
+Rename-Item -Path "$TMP_DOWNLOAD_DIR/$actualDistributionDir" -NewName $MAVEN_HOME_NAME | Out-Null
+try {
+  Move-Item -Path "$TMP_DOWNLOAD_DIR/$MAVEN_HOME_NAME" -Destination $MAVEN_HOME_PARENT | Out-Null
+} catch {
+  if (! (Test-Path -Path "$MAVEN_HOME" -PathType Container)) {
+    Write-Error "fail to move MAVEN_HOME"
+  }
+} finally {
+  try { Remove-Item $TMP_DOWNLOAD_DIR -Recurse -Force | Out-Null }
+  catch { Write-Warning "Cannot remove $TMP_DOWNLOAD_DIR" }
+}
+
+Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+
+
+
+================================================
+FILE: core-service/pom.xml
+================================================
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.5.11</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
+	<groupId>com.cv</groupId>
+	<artifactId>SnapExpense</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>SnapExpense</name>
+	<description>Smart Expense Tracking App</description>
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
+	<properties>
+		<java.version>21</java.version>
+	</properties>
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mapstruct</groupId>
+			<artifactId>mapstruct</artifactId>
+			<version>1.6.3</version>
+		</dependency>
+		<dependency>
+			<groupId>org.mapstruct</groupId>
+			<artifactId>mapstruct-processor</artifactId>
+			<version>1.6.3</version>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-api</artifactId>
+			<version>0.12.6</version>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-impl</artifactId>
+			<version>0.12.6</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-jackson</artifactId>
+			<version>0.12.6</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
+			<version>2.41.8</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webflux</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.projectreactor</groupId>
+			<artifactId>reactor-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</path>
+						<path>
+							<groupId>org.mapstruct</groupId>
+							<artifactId>mapstruct-processor</artifactId>
+							<version>1.6.3</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<excludes>
+						<exclude>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</exclude>
+					</excludes>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/SnapExpenseApplication.java
+================================================
+package com.cv.SnapExpense;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+
+@SpringBootApplication
+@EnableJpaAuditing
+public class SnapExpenseApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(SnapExpenseApplication.class, args);
+	}
+
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/config/S3Config.java
+================================================
+package com.cv.SnapExpense.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+
+import java.net.URI;
+
+@Configuration
+public class S3Config {
+    @Value("${cloud.aws.credentials.access-key}")
+    private String accessKey;
+
+    @Value("${cloud.aws.credentials.secret-key}")
+    private String secretKey;
+
+    @Value("${cloud.aws.region}")
+    private String region;
+
+    @Value("${cloud.aws.s3.endpoint}")
+    private String endpoint;
+
+    @Bean
+    public S3Client s3Client() {
+        return S3Client.builder()
+                .region(Region.of(region))
+                .credentialsProvider(getCredentials())
+                .endpointOverride(URI.create(endpoint))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(true)
+                        .build())
+                .build();
+    }
+
+    @Bean
+    public S3Presigner s3Presigner() {
+        return S3Presigner.builder()
+                .region(Region.of("auto"))
+                .credentialsProvider(getCredentials())
+                .endpointOverride(URI.create(endpoint))
+                .build();
+    }
+
+    private StaticCredentialsProvider getCredentials() {
+        return StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey));
+    }
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/controller/AuthenticationController.java
+================================================
+package com.cv.SnapExpense.controller;
+
+import com.cv.SnapExpense.dto.LoginRequest;
+import com.cv.SnapExpense.dto.LoginResponse;
+import com.cv.SnapExpense.dto.RegistrationRequest;
+import com.cv.SnapExpense.dto.RegistrationResponse;
+import com.cv.SnapExpense.service.AuthenticationService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/auth")
+@RequiredArgsConstructor
+public class AuthenticationController {
+
+    private final AuthenticationService authenticationService;
+
+    @PostMapping("/register")
+    public ResponseEntity<RegistrationResponse> register(@RequestBody @Valid RegistrationRequest registrationRequest) {
+        return new ResponseEntity<>(
+                authenticationService.register(registrationRequest),
+                HttpStatus.CREATED
+        );
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest loginRequest) {
+        return ResponseEntity.ok().body(authenticationService.login(loginRequest));
+    }
+
+
+}
+
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/controller/ReceiptController.java
+================================================
+package com.cv.SnapExpense.controller;
+
+import com.cv.SnapExpense.dto.receipt.PageResponse;
+import com.cv.SnapExpense.dto.receipt.ReceiptResponse;
+import com.cv.SnapExpense.dto.receipt.ReceiptUpdateRequest;
+import com.cv.SnapExpense.dto.receipt.ReceiptVerificationResponse;
+import com.cv.SnapExpense.service.ReceiptService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/receipts")
+@RequiredArgsConstructor
+public class ReceiptController {
+
+    private final ReceiptService receiptService;
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ReceiptResponse> uploadReceipt(
+            @RequestParam("image") MultipartFile image,
+            @RequestParam(value = "categoryId", required = false) Integer categoryId,
+            @RequestParam(value = "notes", required = false) String notes
+    ) throws IOException {
+        ReceiptResponse response = receiptService.uploadReceipt(image, categoryId, notes);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping
+    public ResponseEntity<PageResponse<ReceiptResponse>> getReceipts(
+            @RequestParam(value = "month", required = false) String month,
+            @RequestParam(value = "categoryId", required = false) Integer categoryId,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "sort", defaultValue = "receiptDate,desc") String sort
+    ) {
+        String[] sortParams = sort.split(",");
+        Sort.Direction direction = sortParams.length > 1 && sortParams[1].equalsIgnoreCase("desc") ?
+                Sort.Direction.DESC : Sort.Direction.ASC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParams[0]));
+
+        PageResponse<ReceiptResponse> response = receiptService.getReceipts(month, categoryId, pageable);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ReceiptResponse> getReceiptById(@PathVariable UUID id) {
+        return ResponseEntity.ok(receiptService.getReceiptById(id));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ReceiptResponse> updateReceipt(
+            @PathVariable UUID id,
+            @RequestBody ReceiptUpdateRequest request
+    ) {
+        return ResponseEntity.ok(receiptService.updateReceipt(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteReceipt(@PathVariable UUID id) {
+        receiptService.deleteReceipt(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/verify")
+    public ResponseEntity<ReceiptVerificationResponse> verifyReceipt(@PathVariable UUID id) {
+        return ResponseEntity.ok(receiptService.verifyReceipt(id));
+    }
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/LoginRequest.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+
+@Data
+public class LoginRequest {
+    @Email(message = "The email should be of valid format")
+    @NotBlank(message = "Email is required")
+    @NotNull(message = "Email is required")
+    private String email;
+
+    @Size(min = 8, message = "The password must be minimum {min} characters long")
+    @NotBlank(message = "Password is required")
+    @NotNull(message = "Password is required")
+    private String password;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/LoginResponse.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class LoginResponse {
+    private String accessToken;
+    private String refreshToken;
+    private String expiresIn;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/LogoutRequest.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+@Data
+public class LogoutRequest {
+    @NotBlank(message = "Access Token is required")
+    @NotNull(message = "Access Token is required")
+    private String accessToken;
+
+    @NotBlank(message = "Refresh Token is required")
+    @NotNull(message = "Refresh Token is required")
+    private String refreshToken;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/NewAccessTokenRequest.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+@Data
+public class NewAccessTokenRequest {
+
+    @Email(message = "The email should be of valid format")
+    @NotBlank(message = "Email is required")
+    @NotNull(message = "Email is required")
+    private String email;
+
+    @NotNull(message = "Access token is required")
+    @NotBlank(message = "Access token is required")
+    private String refreshToken;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/NewAccessTokenResponse.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class NewAccessTokenResponse {
+    private String accessToken;
+    private String expiresIn;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/ReceiptItem.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Data;
+
+@Data
+public class ReceiptItem {
+    private String name;
+    private Double quantity;
+    private Double unitPrice;
+    private Double totalPrice;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/ReceiptOcrResponse.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+@Data
+public class ReceiptOcrResponse {
+    private String merchantName;
+    private BigDecimal totalAmount;
+    private String receiptDate;
+    private List<ReceiptItem> items;
+    private String ocrRawText;
+    private BigDecimal ocrConfidence;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/RegistrationRequest.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+
+@Data
+public class RegistrationRequest {
+
+    @Size(min = 2, message = "The name should be minimum {min} characters long")
+    @NotBlank(message = "Name is required")
+    @NotNull(message = "Name is required")
+    private String name;
+
+    @Email(message = "The email should be of valid format")
+    @NotBlank(message = "Email is required")
+    @NotNull(message = "Email is required")
+    private String email;
+
+    @Size(min = 8, message = "The password must be minimum {min} characters long")
+    @NotBlank(message = "Password is required")
+    @NotNull(message = "Password is required")
+    private String password;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/RegistrationResponse.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class RegistrationResponse {
+    private String id;
+    private String name;
+    private String email;
+    private String accessToken;
+    private String refreshToken;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/receipt/CategoryResponse.java
+================================================
+package com.cv.SnapExpense.dto.receipt;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class CategoryResponse {
+    private Integer id;
+    private String name;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/receipt/PageResponse.java
+================================================
+package com.cv.SnapExpense.dto.receipt;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.util.List;
+
+@Data
+@Builder
+public class PageResponse<T> {
+    private List<T> content;
+    private int page;
+    private int size;
+    private long totalElements;
+    private int totalPages;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/receipt/ReceiptItemRequest.java
+================================================
+package com.cv.SnapExpense.dto.receipt;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+
+@Data
+public class ReceiptItemRequest {
+    private String name;
+    private BigDecimal quantity;
+    private BigDecimal unitPrice;
+    private BigDecimal totalPrice;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/receipt/ReceiptItemResponse.java
+================================================
+package com.cv.SnapExpense.dto.receipt;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Data
+@Builder
+public class ReceiptItemResponse {
+    private UUID id;
+    private String name;
+    private BigDecimal quantity;
+    private BigDecimal unitPrice;
+    private BigDecimal totalPrice;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/receipt/ReceiptResponse.java
+================================================
+package com.cv.SnapExpense.dto.receipt;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+@Data
+@Builder
+public class ReceiptResponse {
+    private UUID id;
+    private String imageUrl;
+    private String merchantName;
+    private BigDecimal totalAmount;
+    private LocalDate receiptDate;
+    private CategoryResponse category;
+    private List<ReceiptItemResponse> items;
+    private BigDecimal ocrConfidence;
+    private Boolean isVerified;
+    private String notes;
+    private LocalDateTime createdAt;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/receipt/ReceiptUpdateRequest.java
+================================================
+package com.cv.SnapExpense.dto.receipt;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+
+@Data
+public class ReceiptUpdateRequest {
+    private String merchantName;
+    private BigDecimal totalAmount;
+    private LocalDate receiptDate;
+    private Integer categoryId;
+    private String notes;
+    private List<ReceiptItemRequest> items;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/dto/receipt/ReceiptVerificationResponse.java
+================================================
+package com.cv.SnapExpense.dto.receipt;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.util.UUID;
+
+@Data
+@Builder
+public class ReceiptVerificationResponse {
+    private UUID id;
+    private Boolean isVerified;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/mapper/ReceiptMapper.java
+================================================
+package com.cv.SnapExpense.mapper;
+
+import com.cv.SnapExpense.dto.receipt.CategoryResponse;
+import com.cv.SnapExpense.dto.receipt.ReceiptItemResponse;
+import com.cv.SnapExpense.dto.receipt.ReceiptResponse;
+import com.cv.SnapExpense.model.Category;
+import com.cv.SnapExpense.model.Receipt;
+import com.cv.SnapExpense.model.ReceiptItem;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+
+
+@Mapper(componentModel = "spring")
+public interface ReceiptMapper {
+
+    @Mapping(target = "totalPrice", source = "totalAmount")
+    ReceiptItemResponse toReceiptItemResponse(ReceiptItem item);
+
+    CategoryResponse toCategoryResponse(Category category);
+
+    ReceiptResponse toReceiptResponse(Receipt receipt);
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/model/Category.java
+================================================
+package com.cv.SnapExpense.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "categories")
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Category {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    @Column(nullable = false, unique = true, length = 50)
+    private String name;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/model/MonthlyBudget.java
+================================================
+package com.cv.SnapExpense.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+@Entity
+@Table(
+        name = "monthly_budgets",
+        indexes = {
+                @Index(name = "idx_budgets_user_month", columnList = "user_id, month")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uq_budget_user_category_month",
+                        columnNames = {"user_id", "category_id", "month"}
+                )
+        }
+)
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class MonthlyBudget {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", referencedColumnName = "id")
+    private User user;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", referencedColumnName = "id")
+    private Category category;
+
+    @Column(nullable = false)
+    private LocalDate month;
+
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal budget;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/model/Receipt.java
+================================================
+package com.cv.SnapExpense.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.validator.constraints.URL;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+@Entity
+@Table(
+        name = "receipts",
+        indexes = {
+                @Index(name = "idx_receipts_user_date", columnList = "user_id, receipt_date"),
+                @Index(name = "idx_receipts_user_cat", columnList = "user_id, category_id")
+        }
+)
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class Receipt {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", referencedColumnName = "id")
+    private User user;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", referencedColumnName = "id")
+    private Category category;
+
+    @URL
+    @Column(length = 500, nullable = false)
+    private String imageUrl;
+
+    private String merchantName;
+
+    @Column(precision = 10, scale = 2, nullable = false)
+    private BigDecimal totalAmount;
+
+    @Column
+    private LocalDate receiptDate;
+
+    @OneToMany(mappedBy = "receipt", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<ReceiptItem> items = new ArrayList<>();
+
+    @Column(columnDefinition = "TEXT")
+    private String ocrText;
+
+    @Column(precision = 4, scale = 3)
+    private BigDecimal ocrConfidence;
+
+    @Builder.Default
+    private Boolean isVerified = false;
+
+    @Column(length = 500)
+    private String notes;
+
+    @CreatedDate
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/model/ReceiptItem.java
+================================================
+package com.cv.SnapExpense.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Entity
+@Table(
+        name = "receipt_items",
+        indexes = {
+                @Index(name = "idx_receipt_items_receipt", columnList = "receipt_id")
+        }
+)
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ReceiptItem {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
+    @JoinColumn(name = "receipt_id", nullable = false)
+    private Receipt receipt;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Builder.Default
+    @Column(precision = 6, scale = 2)
+    private BigDecimal quantity = BigDecimal.ONE;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal unitPrice;
+
+    @Column(precision = 10, scale = 2, nullable = false)
+    private BigDecimal totalAmount;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/model/RefreshToken.java
+================================================
+package com.cv.SnapExpense.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(
+        name = "refresh_tokens", indexes = {
+        @Index(name = "idx_refresh_tokens_user_id", columnList = "user_id"),
+        @Index(name = "idx_refresh_tokens_token", columnList = "token"),
+        @Index(name = "idx_refresh_tokens_expires_at", columnList = "expires_at")
+})
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class RefreshToken {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Column(name = "token", length = 500, unique = true, nullable = false)
+    private String token;
+
+    @Column(name = "expires_at", nullable = false)
+    private LocalDateTime expiresAt;
+
+    @Column(name = "revoked_at")
+    private LocalDateTime revokedAt;
+
+    @CreatedDate
+    @Column(name = "created_at", updatable = false, nullable = false)
+    private LocalDateTime createdAt;
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/model/User.java
+================================================
+package com.cv.SnapExpense.model;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+
+@Entity
+@Table(name = "users")
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class User implements UserDetails {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @Column(nullable = false, length = 100)
+    private String name;
+
+    @Email
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column(nullable = false)
+    private String password;
+
+    @CreatedDate
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of();
+    }
+
+    @Override
+    public String getUsername() {
+        return email;
+    }
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/repository/CategoryRepository.java
+================================================
+package com.cv.SnapExpense.repository;
+
+import com.cv.SnapExpense.model.Category;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface CategoryRepository extends JpaRepository<Category, Integer> {
+}
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/repository/ReceiptItemRepository.java
+================================================
+package com.cv.SnapExpense.repository;
+
+import com.cv.SnapExpense.model.ReceiptItem;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.UUID;
+
+public interface ReceiptItemRepository extends JpaRepository<ReceiptItem, UUID> {
+}
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/repository/ReceiptRepository.java
+================================================
+package com.cv.SnapExpense.repository;
+
+import com.cv.SnapExpense.model.Receipt;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.UUID;
+
+public interface ReceiptRepository extends JpaRepository<Receipt, UUID> {
+}
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/repository/RefreshTokenRepository.java
+================================================
+package com.cv.SnapExpense.repository;
+
+import com.cv.SnapExpense.model.RefreshToken;
+import com.cv.SnapExpense.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID> {
+    Optional<RefreshToken> getRefreshTokenByToken(String token);
+
+    Optional<RefreshToken> getRefreshTokenByUserAndExpiresAtAfter(User user, LocalDateTime expiresAtAfter);
+}
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/repository/UserRepository.java
+================================================
+package com.cv.SnapExpense.repository;
+
+import com.cv.SnapExpense.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+import java.util.UUID;
+
+public interface UserRepository extends JpaRepository<User, UUID> {
+    Optional<User> findByEmail(String userEmail);
+}
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/security/BeanConfig.java
+================================================
+package com.cv.SnapExpense.security;
+
+import com.cv.SnapExpense.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+@Configuration
+@RequiredArgsConstructor
+public class BeanConfig {
+
+    private final UserRepository userRepository;
+
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return userEmail -> userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    }
+
+    @Bean
+    public AuthenticationProvider authenticationProvider(PasswordEncoder passwordEncoder) {
+        DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider(userDetailsService());
+        authenticationProvider.setPasswordEncoder(passwordEncoder);
+        return authenticationProvider;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+        return authenticationConfiguration.getAuthenticationManager();
+    }
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/security/JwtFilter.java
+================================================
+package com.cv.SnapExpense.security;
+
+import com.cv.SnapExpense.service.JwtService;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class JwtFilter extends OncePerRequestFilter {
+
+    private final JwtService jwtService;
+    private final UserDetailsService userDetailsService;
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain)
+            throws ServletException, IOException {
+
+        final String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        try {
+            String jwt = authHeader.substring(7);
+            String userEmail = jwtService.extractUsername(jwt);
+
+            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
+
+                if (jwtService.isTokenValid(jwt, userDetails)) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error processing JWT token: {}", e.getMessage());
+        }
+
+        filterChain.doFilter(request, response);
+    }
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/security/SecurityConfig.java
+================================================
+package com.cv.SnapExpense.security;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+public class SecurityConfig {
+    private final JwtFilter jwtFilter;
+    private final AuthenticationProvider authenticationProvider;
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+        return httpSecurity
+                .cors(Customizer.withDefaults())
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(req ->
+                        req.requestMatchers("/api/auth/**")
+                                .permitAll()
+                                .anyRequest()
+                                .authenticated()
+                )
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authenticationProvider(authenticationProvider)
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
+    }
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/service/AuthenticationService.java
+================================================
+package com.cv.SnapExpense.service;
+
+import com.cv.SnapExpense.dto.*;
+import com.cv.SnapExpense.model.RefreshToken;
+import com.cv.SnapExpense.model.User;
+import com.cv.SnapExpense.repository.RefreshTokenRepository;
+import com.cv.SnapExpense.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class AuthenticationService {
+
+    @Value("${jwt.access-key.expiration}")
+    private Long accessKeyExpiration;
+
+    private final JwtService jwtService;
+    private final PasswordEncoder passwordEncoder;
+    private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+
+    @Transactional(rollbackFor = Exception.class)
+    public RegistrationResponse register(RegistrationRequest registrationRequest) {
+        User user = User.builder()
+                .name(registrationRequest.getName())
+                .email(registrationRequest.getEmail())
+                .password(passwordEncoder.encode(registrationRequest.getPassword()))
+                .build();
+
+        userRepository.save(user);
+
+        return RegistrationResponse.builder()
+                .id(user.getId().toString())
+                .name(user.getName())
+                .email(user.getEmail())
+                .accessToken(jwtService.generateAccessToken(user))
+                .refreshToken(jwtService.generateRefreshToken(user).getToken())
+                .build();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public LoginResponse login(LoginRequest loginRequest) {
+        User user = userRepository.findByEmail(loginRequest.getEmail())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        RefreshToken refreshToken = refreshTokenRepository.getRefreshTokenByUserAndExpiresAtAfter(user, LocalDateTime.now())
+                .orElseGet(() -> jwtService.generateRefreshToken(user));
+
+        return LoginResponse.builder()
+                .accessToken(jwtService.generateAccessToken(user))
+                .refreshToken(refreshToken.getToken())
+                .expiresIn(refreshToken.getExpiresAt().toString())
+                .build();
+    }
+
+    public void logout(LogoutRequest logoutRequest) {
+        RefreshToken refreshToken = refreshTokenRepository.getRefreshTokenByToken(logoutRequest.getRefreshToken())
+                .orElseThrow(() ->  new IllegalArgumentException("Invalid refresh token"));
+
+        refreshToken.setRevokedAt(LocalDateTime.now());
+
+        
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public NewAccessTokenResponse getNewAccessToken(NewAccessTokenRequest newAccessTokenRequest) {
+        User user = userRepository.findByEmail(newAccessTokenRequest.getEmail())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        boolean isRefreshTokenValid = jwtService.isTokenValid(newAccessTokenRequest.getRefreshToken(), user);
+
+        if (!isRefreshTokenValid) {
+            return null;
+        }
+
+        Optional<RefreshToken> refreshToken = refreshTokenRepository.getRefreshTokenByToken(newAccessTokenRequest.getRefreshToken());
+
+        if (refreshToken.isEmpty() || refreshToken.get().getRevokedAt() != null) {
+            return null;
+        }
+
+        return NewAccessTokenResponse.builder()
+                .accessToken(jwtService.generateAccessToken(user))
+                .expiresIn(accessKeyExpiration.toString())
+                .build();
+    }
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/service/FastAPIService.java
+================================================
+package com.cv.SnapExpense.service;
+
+import com.cv.SnapExpense.dto.ReceiptOcrResponse;
+import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Service
+public class FastAPIService {
+    private final WebClient webClient;
+
+    public FastAPIService(WebClient.Builder builder) {
+        this.webClient = builder.baseUrl("http://localhost:8000").build();
+    }
+
+    public ReceiptOcrResponse extractReceiptInfo(String presignedUrl) {
+        Map<String, String> body = new HashMap<>();
+        body.put("presigned_url", presignedUrl);
+
+        return webClient.post()
+                .uri("/ocr/extract")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(ReceiptOcrResponse.class)
+                .block();
+    }
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/service/JwtService.java
+================================================
+package com.cv.SnapExpense.service;
+
+import com.cv.SnapExpense.model.RefreshToken;
+import com.cv.SnapExpense.model.User;
+import com.cv.SnapExpense.repository.RefreshTokenRepository;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Service;
+
+import javax.crypto.SecretKey;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Optional;
+import java.util.function.Function;
+
+@Service
+@RequiredArgsConstructor
+public class JwtService {
+    @Value("${jwt.secret.key}")
+    private String secretKey;
+
+    @Value("${jwt.access-key.expiration}")
+    private Long accessKeyExpiration;
+
+    @Value("${jwt.refresh-key.expiration}")
+    private Long refreshKeyExpiration;
+
+    private final RefreshTokenRepository refreshTokenRepository;
+
+    public String extractUsername(String token) {
+        return extractClaims(token, Claims::getSubject);
+    }
+
+    private <T> T extractClaims(String token, Function<Claims, T> claimResolver) {
+        Claims claims = extractAllClaims(token);
+        return claimResolver.apply(claims);
+    }
+
+    private Claims extractAllClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
+    private SecretKey getSigningKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    public String generateAccessToken(UserDetails userDetails) {
+        return buildToken(new HashMap<>(), userDetails, accessKeyExpiration);
+    }
+
+    public RefreshToken generateRefreshToken(UserDetails userDetails) {
+        String token = buildToken(new HashMap<>(), userDetails, refreshKeyExpiration);
+
+        RefreshToken refreshToken = RefreshToken.builder()
+                .user((User) userDetails)
+                .token(token)
+                .expiresAt(LocalDateTime.now().plus(Duration.ofMillis(refreshKeyExpiration)))
+                .build();
+
+        refreshTokenRepository.save(refreshToken);
+
+        return refreshToken;
+    }
+
+    private boolean validateRefreshToken(String token) {
+        Optional<RefreshToken> refreshToken = refreshTokenRepository.getRefreshTokenByToken(token);
+
+        return refreshToken.map(value -> value.getExpiresAt().isAfter(LocalDateTime.now())).orElse(false);
+    }
+
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        String username = extractUsername(token);
+        return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+    }
+
+    private boolean isTokenExpired(String token) {
+        return extractExpiration(token).before(new Date());
+    }
+
+    public Date extractExpiration(String token) {
+        return extractClaims(token, Claims::getExpiration);
+    }
+
+    private String buildToken(
+            HashMap<String, Object> claims,
+            UserDetails userDetails,
+            Long keyExpiration
+    ) {
+        return Jwts.builder()
+                .claims(claims)
+                .subject(userDetails.getUsername())
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + keyExpiration))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/service/ReceiptService.java
+================================================
+package com.cv.SnapExpense.service;
+
+import com.cv.SnapExpense.dto.receipt.PageResponse;
+import com.cv.SnapExpense.dto.receipt.ReceiptResponse;
+import com.cv.SnapExpense.dto.receipt.ReceiptUpdateRequest;
+import com.cv.SnapExpense.dto.receipt.ReceiptVerificationResponse;
+import org.springframework.data.domain.Pageable;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.UUID;
+
+public interface ReceiptService {
+    ReceiptResponse uploadReceipt(MultipartFile image, Integer categoryId, String notes) throws IOException;
+    PageResponse<ReceiptResponse> getReceipts(String month, Integer categoryId, Pageable pageable);
+    ReceiptResponse getReceiptById(UUID id);
+    ReceiptResponse updateReceipt(UUID id, ReceiptUpdateRequest request);
+    void deleteReceipt(UUID id);
+    ReceiptVerificationResponse verifyReceipt(UUID id);
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/service/S3Service.java
+================================================
+package com.cv.SnapExpense.service;
+
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+
+public interface S3Service {
+    String uploadReceipt(MultipartFile receipt, String userId) throws IOException;
+
+    String generateGetPresignedUrl(String filePath);
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/service/impl/ReceiptServiceImpl.java
+================================================
+package com.cv.SnapExpense.service.impl;
+
+import com.cv.SnapExpense.dto.ReceiptOcrResponse;
+import com.cv.SnapExpense.dto.receipt.*;
+import com.cv.SnapExpense.mapper.ReceiptMapper;
+import com.cv.SnapExpense.model.Category;
+import com.cv.SnapExpense.model.Receipt;
+import com.cv.SnapExpense.model.ReceiptItem;
+import com.cv.SnapExpense.model.User;
+import com.cv.SnapExpense.repository.CategoryRepository;
+import com.cv.SnapExpense.repository.ReceiptRepository;
+import com.cv.SnapExpense.repository.UserRepository;
+import com.cv.SnapExpense.service.FastAPIService;
+import com.cv.SnapExpense.service.ReceiptService;
+import com.cv.SnapExpense.service.S3Service;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class ReceiptServiceImpl implements ReceiptService {
+
+    private final ReceiptRepository receiptRepository;
+    private final CategoryRepository categoryRepository;
+    private final UserRepository userRepository;
+    private final ReceiptMapper receiptMapper;
+    private final S3Service s3Service;
+    private final FastAPIService fastAPIService;
+
+    private User getCurrentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    @Override
+    @Transactional
+    public ReceiptResponse uploadReceipt(MultipartFile image, Integer categoryId, String notes) throws IOException {
+        User user = getCurrentUser();
+
+        String filePath = s3Service.uploadReceipt(image, user.getId().toString());
+
+        // TODO: Upload image to S3 and get URL
+        String imageUrl = s3Service.generateGetPresignedUrl(filePath);
+
+        // TODO: Send presigned URL to FastAPI and get extracted data
+        ReceiptOcrResponse receiptOcrResponse = fastAPIService.extractReceiptInfo(imageUrl);
+        // Mocking extracted data for now
+        Category category = null;
+        if (categoryId != null) {
+            category = categoryRepository.findById(categoryId).orElseThrow(() -> new IllegalArgumentException("Category not found"));
+        }
+
+        Receipt receipt = Receipt.builder()
+                .user(user)
+                .imageUrl(imageUrl)
+                .category(category)
+                .merchantName(receiptOcrResponse.getMerchantName())
+                .totalAmount(receiptOcrResponse.getTotalAmount())
+                .receiptDate(receiptOcrResponse.getReceiptDate() != null
+                        ? LocalDate.parse(receiptOcrResponse.getReceiptDate())
+                        : null)
+                .ocrConfidence(receiptOcrResponse.getOcrConfidence())
+                .isVerified(false)
+                .notes(notes)
+                .items(new ArrayList<>())
+                .build();
+
+        receipt = receiptRepository.save(receipt);
+        return receiptMapper.toReceiptResponse(receipt);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<ReceiptResponse> getReceipts(String month, Integer categoryId, Pageable pageable) {
+        // TODO: In a real app, you would filter by month and categoryId using a Specification or a custom Query.
+        // For now, this just retrieves all paginated receipts for the current user.
+        Page<Receipt> page = receiptRepository.findAll(pageable); // Should filter by user
+
+        List<ReceiptResponse> content = page.getContent().stream()
+                .map(receiptMapper::toReceiptResponse)
+                .collect(Collectors.toList());
+
+        return PageResponse.<ReceiptResponse>builder()
+                .content(content)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ReceiptResponse getReceiptById(UUID id) {
+        Receipt receipt = receiptRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Receipt not found"));
+        return receiptMapper.toReceiptResponse(receipt);
+    }
+
+    @Override
+    @Transactional
+    public ReceiptResponse updateReceipt(UUID id, ReceiptUpdateRequest request) {
+        Receipt receipt = receiptRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Receipt not found"));
+
+        receipt.setMerchantName(request.getMerchantName());
+        receipt.setTotalAmount(request.getTotalAmount());
+        receipt.setReceiptDate(request.getReceiptDate());
+        receipt.setNotes(request.getNotes());
+
+        if (request.getCategoryId() != null) {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new RuntimeException("Category not found"));
+            receipt.setCategory(category);
+        }
+
+        if (request.getItems() != null) {
+            receipt.getItems().clear();
+            for (ReceiptItemRequest itemReq : request.getItems()) {
+                ReceiptItem item = ReceiptItem.builder()
+                        .receipt(receipt)
+                        .name(itemReq.getName())
+                        .quantity(itemReq.getQuantity())
+                        .unitPrice(itemReq.getUnitPrice())
+                        .totalAmount(itemReq.getTotalPrice())
+                        .build();
+                receipt.getItems().add(item);
+            }
+        }
+
+        receipt = receiptRepository.save(receipt);
+        return receiptMapper.toReceiptResponse(receipt);
+    }
+
+    @Override
+    @Transactional
+    public void deleteReceipt(UUID id) {
+        receiptRepository.deleteById(id);
+    }
+
+    @Override
+    @Transactional
+    public ReceiptVerificationResponse verifyReceipt(UUID id) {
+        Receipt receipt = receiptRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Receipt not found"));
+
+        receipt.setIsVerified(true);
+        receipt = receiptRepository.save(receipt);
+
+        return ReceiptVerificationResponse.builder()
+                .id(receipt.getId())
+                .isVerified(receipt.getIsVerified())
+                .build();
+    }
+}
+
+
+
+================================================
+FILE: core-service/src/main/java/com/cv/SnapExpense/service/impl/S3ServiceImpl.java
+================================================
+package com.cv.SnapExpense.service.impl;
+
+import com.cv.SnapExpense.service.S3Service;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
+
+import java.io.IOException;
+import java.time.Duration;
+
+@Service
+@RequiredArgsConstructor
+public class S3ServiceImpl implements S3Service {
+
+    @Value("${aws.bucket.name}")
+    private String bucketName;
+
+    private final S3Client s3Client;
+    private final S3Presigner s3Presigner;
+
+    @Override
+    public String uploadReceipt(MultipartFile receipt, String userId) throws IOException {
+        String timestamp = String.valueOf(System.currentTimeMillis());
+        String originalFilename = receipt.getOriginalFilename();
+        String fileExtension = originalFilename != null && originalFilename.contains(".") ?
+                originalFilename.substring(originalFilename.lastIndexOf(".")) : "";
+
+        String key = String.format("receipts/%s/%s/receipt%s", userId, timestamp, fileExtension);
+
+        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                .bucket(bucketName)
+                .key(key)
+                .contentType(receipt.getContentType())
+                .contentLength(receipt.getSize())
+                .build();
+
+        s3Client.putObject(putObjectRequest, RequestBody.fromBytes(receipt.getBytes()));
+
+        return key;
+    }
+
+    @Override
+    public String generateGetPresignedUrl(String filePath) {
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(bucketName)
+                .key(filePath)
+                .build();
+
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofMinutes(10))
+                .getObjectRequest(getObjectRequest)
+                .build();
+
+        PresignedGetObjectRequest presignedGetObjectRequest = s3Presigner.presignGetObject(presignRequest);
+        return presignedGetObjectRequest.url().toString();
+    }
+}
+
+
+
+================================================
+FILE: core-service/src/main/resources/application.yaml
+================================================
+spring:
+  application:
+    name: SnapExpense
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 5MB
+      max-request-size: 5MB
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database: PostgreSQL
+    defer-datasource-initialization: true
+  datasource:
+    url: jdbc:postgresql://localhost:5432/${POSTGRES_DB:SnapExpense}
+    username: user
+    password: changemeinprod!
+  sql:
+    init:
+      mode: always
+jwt:
+  secret:
+    key: NGcBg3HXwWwe+ZULip6sBwsU8/tW7YnycZVt2VV5GQVb28xGHUxd8LdgK30ThHh+upC44dWRPs0p9Hy8nhgqww==
+  access-key:
+    expiration: 86400000
+  refresh-key:
+    expiration: 604800000
+
+cloud:
+  aws:
+    credentials:
+      access-key: ${S3-ACCESS-KEY}
+      secret-key: ${S3-SECRET-KEY}
+    region: auto
+    s3:
+      endpoint: ${S3-ENDPOINT}
+
+aws:
+  bucket:
+    name: ${S3-BUCKET-NAME}
+
+
+
+
+================================================
+FILE: core-service/src/main/resources/data.sql
+================================================
+insert into categories(name)
+values ('Test'),
+       ('Test2');
+
+
+================================================
+FILE: core-service/src/test/java/com/cv/SnapExpense/SpendSenseApplicationTests.java
+================================================
+package com.cv.SnapExpense;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class SpendSenseApplicationTests {
+
+	@Test
+	void contextLoads() {
+	}
+
+}
+
+
+
+================================================
+FILE: core-service/.mvn/wrapper/maven-wrapper.properties
+================================================
+wrapperVersion=3.3.4
+distributionType=only-script
+distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.12/apache-maven-3.9.12-bin.zip
+
+
