@@ -7,7 +7,7 @@ import com.cv.SnapExpense.model.Category;
 import com.cv.SnapExpense.model.User;
 import com.cv.SnapExpense.repository.ReceiptRepository;
 import com.cv.SnapExpense.service.ExpensesService;
-import com.cv.SnapExpense.service.dto.SpendingTrendDTO;
+import com.cv.SnapExpense.dto.SpendingTrendDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -32,10 +32,10 @@ public class ExpensesServiceImpl implements ExpensesService {
 
     @Override
     @Transactional(readOnly = true)
-    public ExpensesSummary getExpenses(YearMonth yearMonth) {
-        if (yearMonth == null) yearMonth = YearMonth.now();
+    public ExpensesSummary getExpenses(YearMonth month) {
+        if (month == null) month = YearMonth.now();
 
-        LocalDate from = yearMonth.atDay(1);
+        LocalDate from = month.atDay(1);
         LocalDate to = from.plusMonths(1);
 
         User user = (User) SecurityContextHolder.getContext()
@@ -54,7 +54,7 @@ public class ExpensesServiceImpl implements ExpensesService {
                 .multiply(BigDecimal.valueOf(100));
 
         return ExpensesSummary.builder()
-                .month(yearMonth)
+                .month(month)
                 .totalSpend(totalSpend)
                 .totalBudget(totalBudget)
                 .remainingBudget(totalBudget.subtract(totalSpend))
@@ -65,10 +65,10 @@ public class ExpensesServiceImpl implements ExpensesService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CategoryExpensesSummary> getExpensesByCategories(YearMonth yearMonth) {
-        if (yearMonth == null) yearMonth = YearMonth.now();
+    public List<CategoryExpensesSummary> getExpensesByCategories(YearMonth month) {
+        if (month == null) month = YearMonth.now();
 
-        LocalDate from = yearMonth.atDay(1);
+        LocalDate from = month.atDay(1);
         LocalDate to = from.plusMonths(1);
 
         User user = (User) SecurityContextHolder.getContext()
@@ -95,7 +95,7 @@ public class ExpensesServiceImpl implements ExpensesService {
 
             summaries.add(
                     CategoryExpensesSummary.builder()
-                            .month(yearMonth)
+                            .month(month)
                             .category(category)
                             .totalSpend(spent)
                             .totalBudget(budget)

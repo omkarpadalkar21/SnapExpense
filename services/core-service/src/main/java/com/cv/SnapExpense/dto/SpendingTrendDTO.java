@@ -1,4 +1,4 @@
-package com.cv.SnapExpense.service.dto;
+package com.cv.SnapExpense.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
