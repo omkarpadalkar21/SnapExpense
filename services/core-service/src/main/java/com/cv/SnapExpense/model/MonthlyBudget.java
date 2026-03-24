@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 
 @Entity
 @Table(
@@ -38,7 +39,7 @@ public class MonthlyBudget {
     private Category category;
 
     @Column(nullable = false)
-    private LocalDate month;
+    private YearMonth month;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal budget;
