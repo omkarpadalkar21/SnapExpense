@@ -1,3 +1,12 @@
+package com.cv.SnapExpense.controller;
+
+import com.cv.SnapExpense.dto.UserProfileDto;
+import com.cv.SnapExpense.dto.UserProfileUpdateDto;
+import com.cv.SnapExpense.service.UserProfileService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/user/profile")
 @RequiredArgsConstructor
