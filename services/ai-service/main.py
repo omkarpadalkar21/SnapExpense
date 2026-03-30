@@ -1,10 +1,12 @@
 import logging
 import os
 import asyncio
+import tempfile
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Dict
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -113,6 +115,69 @@ async def extract_ocr(request: OCRRequest):
             downloader.cleanup_temp_file(temp_file_path)
 
 
+@app.post("/ocr/extract/upload", response_model=OcrExtractedData)
+async def extract_ocr_upload(file: UploadFile = File(...)):
+    """
+    Extract OCR data from a directly uploaded receipt image.
+
+    Args:
+        file: Uploaded image file (multipart/form-data)
+
+    Returns:
+        OcrExtractedData: Structured receipt data with OCR results
+    """
+    temp_file_path = None
+
+    try:
+        # Validate content type
+        if not file.content_type or not file.content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=400,
+                detail=ErrorResponse(
+                    error=f"Invalid file type '{file.content_type}'. Only image files are accepted.",
+                    code="INVALID_FILE_TYPE"
+                ).dict()
+            )
+
+        logger.info(f"Processing upload OCR request for file: {file.filename}")
+
+        # Infer extension from original filename, fall back to .jpg
+        suffix = Path(file.filename).suffix if file.filename and Path(file.filename).suffix else ".jpg"
+
+        # Write uploaded bytes to a named temp file
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            temp_file_path = tmp.name
+            tmp.write(await file.read())
+
+        # Perform OCR processing
+        paddleocr_result = ocr_service.extract_text_from_image(temp_file_path)
+
+        # Parse receipt data
+        receipt_data = ocr_service.parse_receipt_data(paddleocr_result)
+
+        logger.info(
+            f"OCR processing completed for '{file.filename}'. "
+            f"Confidence: {receipt_data.ocrConfidence}"
+        )
+        return receipt_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"OCR processing failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=ErrorResponse(
+                error=f"OCR processing failed: {str(e)}",
+                code="OCR_PROCESSING_ERROR"
+            ).dict()
+        )
+    finally:
+        # Clean up temporary file
+        if temp_file_path:
+            downloader.cleanup_temp_file(temp_file_path)
+
+
 @app.get("/")
 async def root():
     """Root endpoint"""
@@ -123,6 +188,7 @@ async def root():
         "endpoints": {
             "health": "/health",
             "ocr_extract": "/ocr/extract",
+            "ocr_extract_upload": "/ocr/extract/upload",
             "docs": "/docs"
         }
     }
