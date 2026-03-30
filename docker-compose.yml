@@ -9,12 +9,16 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: changemeinprod!
       POSTGRES_DB: SnapExpense
-  ai-service:
-    build:
-      context: ./services/ai-service
-    ports:
-      - "8000:8000"
-    restart: unless-stopped
-    environment:
-      FLAGS_use_mkldnn: "0"
-      FLAGS_enable_pir_in_executor: "0"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+volumes:
+  postgres_data:
+  # ai-service:
+  #   build:
+  #     context: ./services/ai-service
+  #   ports:
+  #     - "8000:8000"
+  #   restart: unless-stopped
+  #   environment:
+  #     FLAGS_use_mkldnn: "0"
+  #     FLAGS_enable_pir_in_executor: "0"
