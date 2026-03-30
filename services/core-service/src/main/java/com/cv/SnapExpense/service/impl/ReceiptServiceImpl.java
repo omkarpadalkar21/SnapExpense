@@ -79,7 +79,31 @@ public class ReceiptServiceImpl implements ReceiptService {
                 .items(new ArrayList<>())
                 .build();
 
+// Save first to get the receipt ID
         receipt = receiptRepository.save(receipt);
+
+// Then map and attach OCR items
+        if (receiptOcrResponse.getItems() != null && !receiptOcrResponse.getItems().isEmpty()) {
+            Receipt finalReceipt = receipt;
+            List<ReceiptItem> items = receiptOcrResponse.getItems().stream()
+                    .map(ocrItem -> ReceiptItem.builder()
+                            .receipt(finalReceipt)
+                            .name(ocrItem.getName())
+                            .quantity(ocrItem.getQuantity() != null
+                                    ? BigDecimal.valueOf(ocrItem.getQuantity())
+                                    : BigDecimal.ONE)
+                            .unitPrice(ocrItem.getUnitPrice() != null
+                                    ? BigDecimal.valueOf(ocrItem.getUnitPrice())
+                                    : BigDecimal.ZERO)
+                            .totalAmount(ocrItem.getTotalPrice() != null
+                                    ? BigDecimal.valueOf(ocrItem.getTotalPrice())
+                                    : BigDecimal.ZERO)
+                            .build())
+                    .collect(Collectors.toList());
+            receipt.setItems(items);
+            receipt = receiptRepository.save(receipt);
+        }
+
         return receiptMapper.toReceiptResponse(receipt);
     }
 
