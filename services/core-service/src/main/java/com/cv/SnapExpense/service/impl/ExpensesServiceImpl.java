@@ -41,9 +41,15 @@ public class ExpensesServiceImpl implements ExpensesService {
 
         Object[] row = receiptRepository.getMonthlySummary(user, month, from, to);
 
-        BigDecimal totalSpend = row[0] != null ? (BigDecimal) row[0] : BigDecimal.ZERO;
-        BigDecimal totalBudget = (BigDecimal) row[2];
-        long receiptCount = (Long) row[1];
+        BigDecimal totalSpend = row[0] != null
+                ? new BigDecimal(row[0].toString())
+                : BigDecimal.ZERO;
+        long receiptCount = row[1] != null
+                ? ((Number) row[1]).longValue()
+                : 0L;
+        BigDecimal totalBudget = row[2] != null
+                ? new BigDecimal(row[2].toString())
+                : BigDecimal.ZERO;
 
         BigDecimal percentUsed = totalBudget.compareTo(BigDecimal.ZERO) == 0
                 ? BigDecimal.ZERO
