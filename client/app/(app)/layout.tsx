@@ -15,7 +15,7 @@ function AppAuthRedirect() {
 
   useEffect(() => {
     if (hydrated && !localStorage.getItem("accessToken")) {
-      router.replace("/login"); // ← NOT /auth/login
+      router.replace("/auth/login");
     }
   }, [hydrated, router]);
 
