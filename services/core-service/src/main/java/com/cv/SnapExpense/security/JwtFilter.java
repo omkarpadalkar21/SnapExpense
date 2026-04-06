@@ -26,7 +26,6 @@ public class JwtFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
 
-    // JwtFilter.java — FIXED
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -51,20 +50,37 @@ public class JwtFilter extends OncePerRequestFilter {
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 } else {
-                    // Token present but invalid — reject immediately
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.setContentType("application/json");
-                    response.getWriter().write("{\"error\":\"Invalid or expired token\"}");
+                    // Token present but invalid — write 401 with CORS header so the
+                    // browser doesn't swallow it as an opaque network error.v
+                    writeUnauthorized(request, response, "Invalid or expired token");
                     return;
                 }
             }
         } catch (Exception e) {
             log.error("JWT processing error: {}", e.getMessage());
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"Invalid token\"}");
+            writeUnauthorized(request, response, "Invalid token");
             return;
         }
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Writes a 401 JSON response and copies the request's Origin back as
+     * Access-Control-Allow-Origin so the browser can read the error body.
+     * (The CorsFilter already ran, but if this filter short-circuits *before*
+     * CorsFilter adds headers, we need to do it manually here.)
+     */
+    private void writeUnauthorized(HttpServletRequest request,
+                                   HttpServletResponse response,
+                                   String message) throws IOException {
+        String origin = request.getHeader("Origin");
+        if (origin != null) {
+            response.setHeader("Access-Control-Allow-Origin", origin);
+            response.setHeader("Access-Control-Allow-Credentials", "true");
+            response.setHeader("Vary", "Origin");
+        }
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.getWriter().write("{\"error\":\"" + message + "\"}");
     }
 }
