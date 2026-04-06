@@ -88,13 +88,25 @@ export const useGetCategories = () => {
   });
 };
 
-// ─── Budgets ───────────────────────────────────────────────────────────────────
+// Shape matching the backend's GetBudgetResponse DTO
+interface GetBudgetResponse {
+  categoryId: number;
+  categoryName: string;
+  month: string;
+  budget: number;
+}
+
+// Shape matching the backend's SetBudgetRequest.BudgetEntry DTO
+interface BudgetEntry {
+  categoryId: number;
+  budget: number;
+}
 
 export const useGetBudgetByMonth = (month?: string) => {
   const canFetch = useCanUseAuthenticatedApi();
   return useQuery({
     queryKey: ["budgets", month],
-    queryFn: () => api.get<Budget[]>("/budgets", month ? { month } : undefined),
+    queryFn: () => api.get<GetBudgetResponse[]>("/budgets", month ? { month } : undefined),
     enabled: canFetch,
   });
 };
@@ -102,10 +114,13 @@ export const useGetBudgetByMonth = (month?: string) => {
 export const useSetBudgetByMonth = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { month: string; budgets: Budget[] }) =>
-      api.put("/budgets", data),
+    mutationFn: (data: { month: string; budgets: BudgetEntry[] }) =>
+      api.put<{ month: string; updated: number }>("/budgets", data),
     onSuccess: (_, variables) => {
+      // Refresh budgets for this month
       queryClient.invalidateQueries({ queryKey: ["budgets", variables.month] });
+      // Also refresh expenses so analytics (category cards, donut chart) update
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },
   });
 };
