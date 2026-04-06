@@ -76,6 +76,18 @@ export const useAuthRegister = () => {
   });
 };
 
+// ─── Categories ────────────────────────────────────────────────────────────────
+
+export const useGetCategories = () => {
+  const canFetch = useCanUseAuthenticatedApi();
+  return useQuery({
+    queryKey: ["categories"],
+    queryFn: () => api.get<{ id: number; name: string; icon: string; color: string }[]>("/categories"),
+    enabled: canFetch,
+    staleTime: Infinity, // Categories rarely change — cache forever per session
+  });
+};
+
 // ─── Budgets ───────────────────────────────────────────────────────────────────
 
 export const useGetBudgetByMonth = (month?: string) => {
