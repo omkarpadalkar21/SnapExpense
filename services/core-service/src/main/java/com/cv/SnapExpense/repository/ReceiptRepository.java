@@ -26,7 +26,7 @@ public interface ReceiptRepository extends JpaRepository<Receipt, UUID> {
         AND r.receiptDate >= :monthStart
         AND r.receiptDate < :monthEnd
 """)
-    Object[] getMonthlySummary(
+    List<Object[]> getMonthlySummary(
             @Param("user") User user,
             @Param("month") YearMonth month,
             @Param("monthStart") LocalDate monthStart,
