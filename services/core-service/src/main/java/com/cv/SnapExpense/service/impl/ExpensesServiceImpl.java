@@ -1,7 +1,6 @@
 package com.cv.SnapExpense.service.impl;
 
 import com.cv.SnapExpense.dto.*;
-import com.cv.SnapExpense.model.Category;
 import com.cv.SnapExpense.model.User;
 import com.cv.SnapExpense.repository.ReceiptRepository;
 import com.cv.SnapExpense.service.ExpensesService;
