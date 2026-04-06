@@ -1,19 +1,31 @@
 "use client";
 
-import { Bell } from "lucide-react";
+import { Bell, Loader2 } from "lucide-react";
 import { HeroCard } from "@/components/home/HeroCard";
 import { SpendingChart } from "@/components/home/SpendingChart";
 import { RecentReceipts } from "@/components/home/RecentReceipts";
-import { MOCK_SUMMARY, MOCK_TRENDS, MOCK_RECEIPTS, MOCK_USER } from "@/lib/mockData";
+import { useExpensesSummary, useSpendingTrend, useGetReceipts, useUserProfile } from "@/hooks/useApi";
 
 export default function HomePage() {
+  const { data: summary, isPending: pendingSummary } = useExpensesSummary();
+  const { data: trends, isPending: pendingTrends } = useSpendingTrend(6);
+  const { data: receiptsPage, isPending: pendingReceipts } = useGetReceipts({
+    page: 0,
+    size: 5,
+  });
+  const { data: user, isPending: pendingUser } = useUserProfile();
+
+  if (pendingSummary || pendingTrends || pendingReceipts || pendingUser) {
+    return <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin" /></div>;
+  }
+
   return (
     <div className="px-4 pt-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between animate-fade-in-up">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
-            {MOCK_USER.initials}
+            {user?.initials || "OP"}
           </div>
           <h1 className="text-lg font-bold tracking-tight">SnapExpense</h1>
         </div>
@@ -24,13 +36,13 @@ export default function HomePage() {
       </div>
 
       {/* Hero Card */}
-      <HeroCard summary={MOCK_SUMMARY} />
+      {summary && <HeroCard summary={summary} />}
 
       {/* Spending Chart */}
-      <SpendingChart data={MOCK_TRENDS} />
+      {trends && <SpendingChart data={trends} />}
 
       {/* Recent Receipts */}
-      <RecentReceipts receipts={MOCK_RECEIPTS} />
+      {receiptsPage && <RecentReceipts receipts={receiptsPage.content || []} />}
     </div>
   );
 }

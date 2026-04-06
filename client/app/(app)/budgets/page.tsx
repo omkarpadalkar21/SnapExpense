@@ -1,14 +1,23 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { format } from "date-fns";
 import { BudgetForm } from "@/components/budgets/BudgetForm";
 import { useMonthSelector } from "@/hooks/useMonthSelector";
-import { MOCK_BUDGETS } from "@/lib/mockData";
+import { useGetBudgetByMonth, useSetBudgetByMonth } from "@/hooks/useApi";
 
 export default function BudgetsPage() {
   const router = useRouter();
-  const { monthYear, goToPreviousMonth, goToNextMonth } = useMonthSelector();
+  const { monthYear, selectedDate, goToPreviousMonth, goToNextMonth } = useMonthSelector();
+  const monthParam = format(selectedDate, "yyyy-MM");
+
+  const { data: budgets, isPending } = useGetBudgetByMonth(monthParam);
+  const { mutate: setBudgets, isPending: saving } = useSetBudgetByMonth();
+
+  const handleSave = (newBudgets: import("@/lib/types").Budget[]) => {
+    setBudgets({ month: monthParam, budgets: newBudgets });
+  };
 
   return (
     <div className="px-4 pt-4 space-y-5">
@@ -34,7 +43,11 @@ export default function BudgetsPage() {
       </div>
 
       {/* Budget Form */}
-      <BudgetForm budgets={MOCK_BUDGETS} />
+      {isPending ? (
+        <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin" /></div>
+      ) : (
+        <BudgetForm budgets={budgets || []} onSave={handleSave} saving={saving} />
+      )}
     </div>
   );
 }

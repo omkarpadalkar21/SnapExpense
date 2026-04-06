@@ -1,22 +1,23 @@
 export interface Receipt {
-  id: string;
+  id?: string;
   merchantName: string;
-  category: string;
-  amount: number;
-  date: string;
+  category?: { id: number; name: string };
+  categoryId?: number; // for create request
+  totalAmount: number;
+  receiptDate: string;
   imageUrl?: string;
   isVerified: boolean;
   ocrConfidence: number;
   notes?: string;
-  lineItems: LineItem[];
+  items: LineItem[];
 }
 
 export interface LineItem {
-  id: string;
+  id?: string;
   name: string;
   quantity: number;
   unitPrice: number;
-  total: number;
+  totalPrice: number;
 }
 
 export interface MonthlySummary {
@@ -56,11 +57,30 @@ export interface UserProfile {
   initials: string;
 }
 
-export type UploadStep = "idle" | "uploading" | "processing" | "reviewing" | "saved";
+export type UploadStep =
+  | "idle"
+  | "uploading"
+  | "processing"
+  | "reviewing"
+  | "saved";
 
 export interface Category {
   id: string;
   name: string;
   icon: string;
   color: string;
+}
+
+export interface LoginResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: string;
+}
+
+export interface RegistrationResponse {
+  id: string;
+  name: string;
+  email: string;
+  accessToken: string;
+  refreshToken: string;
 }

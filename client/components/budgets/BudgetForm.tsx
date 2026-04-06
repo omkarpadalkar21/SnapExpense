@@ -6,11 +6,15 @@ import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/formatCurrency";
 import type { Budget } from "@/lib/types";
 
+import { Loader2 } from "lucide-react";
+
 interface BudgetFormProps {
   budgets: Budget[];
+  onSave?: (budgets: Budget[]) => void;
+  saving?: boolean;
 }
 
-export function BudgetForm({ budgets: initialBudgets }: BudgetFormProps) {
+export function BudgetForm({ budgets: initialBudgets, onSave, saving }: BudgetFormProps) {
   const [budgets, setBudgets] = useState(initialBudgets);
 
   const total = useMemo(() => budgets.reduce((s, b) => s + b.amount, 0), [budgets]);
@@ -55,7 +59,8 @@ export function BudgetForm({ budgets: initialBudgets }: BudgetFormProps) {
       </div>
 
       <div className="sticky bottom-20 pt-3">
-        <Button className="w-full" size="lg">
+        <Button onClick={() => onSave?.(budgets)} disabled={saving} className="w-full" size="lg">
+          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Save Budgets
         </Button>
       </div>

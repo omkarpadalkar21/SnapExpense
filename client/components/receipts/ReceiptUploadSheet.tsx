@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState, useEffect } from "react";
 import { Camera, ImageIcon, Upload, CheckCircle2, Loader2 } from "lucide-react";
 import {
   Sheet,
@@ -27,11 +27,40 @@ export function ReceiptUploadSheet({ open, onOpenChange }: ReceiptUploadSheetPro
     previewUrl,
     progress,
     statusText,
+    extractedData,
     selectFile,
     uploadAndScan,
     confirmAndSave,
     reset,
   } = useReceiptUpload();
+
+  const [reviewData, setReviewData] = useState<any>(null);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    if (step === "reviewing" && extractedData) {
+      setReviewData(extractedData);
+      setErrorMsg("");
+    }
+  }, [step, extractedData]);
+
+  const handleConfirm = useCallback(() => {
+    if (!reviewData) return;
+    
+    // Validations
+    if (reviewData.totalAmount < 0) {
+      setErrorMsg("Total Amount cannot be negative.");
+      return;
+    }
+    const itemsTotal = reviewData.items?.reduce((sum: number, item: any) => sum + (Number(item.totalPrice) || 0), 0) || 0;
+    if (reviewData.totalAmount < itemsTotal) {
+      setErrorMsg(`Total Amount (${reviewData.totalAmount}) cannot be less than sum of items (${itemsTotal}).`);
+      return;
+    }
+
+    setErrorMsg("");
+    confirmAndSave(reviewData);
+  }, [reviewData, confirmAndSave]);
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -154,35 +183,119 @@ export function ReceiptUploadSheet({ open, onOpenChange }: ReceiptUploadSheetPro
           )}
 
           {/* Step 4: Review extracted data */}
-          {step === "reviewing" && (
+          {step === "reviewing" && reviewData && (
             <div className="space-y-4 animate-fade-in-up">
               <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                  <p className="text-sm font-medium text-emerald-800">Data extracted successfully!</p>
+                  <p className="text-sm font-medium text-emerald-800">Data extracted successfully! Review and edit.</p>
                 </div>
               </div>
+
+              {errorMsg && (
+                <div className="rounded-2xl bg-red-50 border border-red-200 p-3">
+                  <p className="text-sm font-medium text-red-800">{errorMsg}</p>
+                </div>
+              )}
 
               <div className="space-y-3">
                 <div>
                   <label className="text-xs text-muted-foreground">Merchant</label>
-                  <Input defaultValue="Scanned Store" />
+                  <Input 
+                    value={reviewData.merchantName || ""} 
+                    onChange={e => setReviewData({...reviewData, merchantName: e.target.value})} 
+                  />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Amount (₹)</label>
-                  <Input type="number" defaultValue="0" />
+                  <label className="text-xs text-muted-foreground">Total Amount (₹)</label>
+                  <Input 
+                    type="number" 
+                    value={reviewData.totalAmount || 0} 
+                    onChange={e => setReviewData({...reviewData, totalAmount: parseFloat(e.target.value) || 0})}
+                  />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Date</label>
-                  <Input type="date" defaultValue={new Date().toISOString().split("T")[0]} />
+                  <Input 
+                    type="date" 
+                    value={reviewData.receiptDate || new Date().toISOString().split("T")[0]} 
+                    onChange={e => setReviewData({...reviewData, receiptDate: e.target.value})}
+                  />
                 </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Category</label>
-                  <Input defaultValue="Groceries" />
-                </div>
+
+                {reviewData.items && reviewData.items.length > 0 && (
+                  <div className="mt-4">
+                    <label className="text-xs text-muted-foreground block mb-2">Items</label>
+                    <div className="border rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-muted text-muted-foreground text-xs uppercase">
+                          <tr>
+                            <th className="px-3 py-2">Item</th>
+                            <th className="px-3 py-2 text-right">Qty</th>
+                            <th className="px-3 py-2 text-right">Price</th>
+                            <th className="px-3 py-2 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {reviewData.items.map((item: any, idx: number) => (
+                            <tr key={idx} className="bg-background">
+                              <td className="px-3 py-2">
+                                <Input 
+                                  className="h-8 text-xs px-2"
+                                  value={item.name} 
+                                  onChange={e => {
+                                    const newItems = [...reviewData.items];
+                                    newItems[idx].name = e.target.value;
+                                    setReviewData({...reviewData, items: newItems});
+                                  }}
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <Input 
+                                  className="h-8 text-xs px-2 w-16 text-right ml-auto"
+                                  type="number"
+                                  value={item.quantity} 
+                                  onChange={e => {
+                                    const newItems = [...reviewData.items];
+                                    newItems[idx].quantity = parseFloat(e.target.value) || 0;
+                                    setReviewData({...reviewData, items: newItems});
+                                  }}
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <Input 
+                                  className="h-8 text-xs px-2 w-20 text-right ml-auto"
+                                  type="number"
+                                  value={item.unitPrice} 
+                                  onChange={e => {
+                                    const newItems = [...reviewData.items];
+                                    newItems[idx].unitPrice = parseFloat(e.target.value) || 0;
+                                    setReviewData({...reviewData, items: newItems});
+                                  }}
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-right font-medium">
+                                <Input 
+                                  className="h-8 text-xs px-2 w-20 text-right ml-auto"
+                                  type="number"
+                                  value={item.totalPrice} 
+                                  onChange={e => {
+                                    const newItems = [...reviewData.items];
+                                    newItems[idx].totalPrice = parseFloat(e.target.value) || 0;
+                                    setReviewData({...reviewData, items: newItems});
+                                  }}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <Button onClick={confirmAndSave} className="w-full" size="lg">
+              <Button onClick={handleConfirm} className="w-full" size="lg">
                 <CheckCircle2 className="h-5 w-5 mr-2" />
                 Confirm & Save
               </Button>

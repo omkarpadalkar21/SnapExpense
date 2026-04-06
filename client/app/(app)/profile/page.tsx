@@ -8,25 +8,37 @@ import {
   Lock,
   BellRing,
   Calculator,
-  Settings,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { MOCK_USER } from "@/lib/mockData";
 import Link from "next/link";
+import { useUserProfile, useDeleteUserProfile } from "@/hooks/useApi";
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { data: user, isPending } = useUserProfile();
+
+  if (isPending) {
+    return <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin" /></div>;
+  }
+  const handleLogout = () => {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    router.push("/auth/login"); // ← was "/login", now correct
+  };
 
   return (
     <div className="px-4 pt-6 space-y-6">
       {/* Profile Header */}
-      <div className="flex flex-col items-center text-center animate-fade-in-up">
-        <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-          {MOCK_USER.initials}
+      {user && (
+        <div className="flex flex-col items-center text-center animate-fade-in-up">
+          <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+            {user.initials || user.name.charAt(0).toUpperCase()}
+          </div>
+          <h2 className="text-lg font-bold mt-3">{user.name}</h2>
+          <p className="text-sm text-muted-foreground">{user.email}</p>
         </div>
-        <h2 className="text-lg font-bold mt-3">{MOCK_USER.name}</h2>
-        <p className="text-sm text-muted-foreground">{MOCK_USER.email}</p>
-      </div>
+      )}
 
       {/* Sections */}
       <div className="space-y-2 animate-fade-in-up" style={{ animationDelay: "100ms" }}>
@@ -76,7 +88,7 @@ export default function ProfilePage() {
       </div>
 
       <div className="animate-fade-in-up" style={{ animationDelay: "220ms" }}>
-        <Button variant="destructive-outline" className="w-full" size="lg">
+        <Button onClick={handleLogout} variant="destructive-outline" className="w-full" size="lg">
           <LogOut className="h-4 w-4 mr-2" />
           Log Out
         </Button>

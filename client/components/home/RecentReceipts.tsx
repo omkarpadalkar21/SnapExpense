@@ -26,7 +26,7 @@ export function RecentReceipts({ receipts }: RecentReceiptsProps) {
 
       <div className="space-y-2.5 stagger-children">
         {receipts.slice(0, 5).map((receipt) => {
-          const cat = CATEGORIES.find((c) => c.name === receipt.category);
+          const cat = CATEGORIES.find((c) => c.name === receipt.category?.name);
 
           return (
             <Link
@@ -59,16 +59,16 @@ export function RecentReceipts({ receipts }: RecentReceiptsProps) {
                   )}
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-xs text-muted-foreground">{receipt.category}</span>
+                  <span className="text-xs text-muted-foreground">{receipt.category?.name}</span>
                   <span className="text-xs text-muted-foreground">·</span>
                   <span className="text-xs text-muted-foreground">
-                    {format(parseISO(receipt.date), "dd MMM")}
+                    {format(parseISO(receipt.receiptDate), "dd MMM")}
                   </span>
                 </div>
               </div>
 
               <p className="text-sm font-semibold text-accent whitespace-nowrap">
-                {formatCurrency(receipt.amount)}
+                {formatCurrency(receipt.totalAmount)}
               </p>
             </Link>
           );

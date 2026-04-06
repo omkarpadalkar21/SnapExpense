@@ -52,7 +52,7 @@ export function LineItemsAccordion({ items, editable = false }: LineItemsAccordi
                       <Input defaultValue={item.unitPrice} type="number" className="h-8 text-xs text-right" />
                     </div>
                     <div className="col-span-2 text-right text-xs font-medium">
-                      {formatCurrency(item.total)}
+                      {formatCurrency(item.totalPrice)}
                     </div>
                     <div className="col-span-1 flex justify-end">
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-danger">
@@ -68,7 +68,7 @@ export function LineItemsAccordion({ items, editable = false }: LineItemsAccordi
                       {formatCurrency(item.unitPrice)}
                     </div>
                     <div className="col-span-3 text-xs text-right font-medium">
-                      {formatCurrency(item.total)}
+                      {formatCurrency(item.totalPrice)}
                     </div>
                   </>
                 )}

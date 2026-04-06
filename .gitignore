@@ -1,1 +1,8 @@
 services/ai-service/venv
+services/ai-service/__pycache__/*
+
+services/ai-service/__pycache__/downloader.cpython-312.pyc
+services/core-service/digest.txt
+.gitignore
+services/core-service/src/main/java/com/cv/SnapExpense/model/digest.txt
+.gitignore

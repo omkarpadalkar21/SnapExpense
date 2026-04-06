@@ -1,39 +1,52 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Bell, Wallet, ReceiptText } from "lucide-react";
+import { Bell, Wallet, ReceiptText, Loader2 } from "lucide-react";
 import { format, parseISO, isSameDay } from "date-fns";
 import { WeekCalendarStrip } from "@/components/shared/WeekCalendarStrip";
 import { ReceiptCard } from "@/components/receipts/ReceiptCard";
 import { formatCurrency } from "@/lib/formatCurrency";
-import { MOCK_RECEIPTS, MOCK_SUMMARY, MOCK_USER } from "@/lib/mockData";
+import { useGetReceipts, useExpensesSummary, useUserProfile } from "@/hooks/useApi";
 
 export default function ReceiptsPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
+  const { data: user } = useUserProfile();
+  const { data: summary } = useExpensesSummary();
+  const { data: receiptsPage, isPending: pendingReceipts } = useGetReceipts({
+    page: 0,
+    size: 50,
+  });
+
+  const rawReceipts = receiptsPage?.content || [];
+
   const datesWithReceipts = useMemo(
-    () => [...new Set(MOCK_RECEIPTS.map((r) => r.date))],
-    []
+    () => [...new Set(rawReceipts.map((r) => r.receiptDate))],
+    [rawReceipts]
   );
 
   const filteredReceipts = useMemo(
     () =>
-      MOCK_RECEIPTS.filter((r) => isSameDay(parseISO(r.date), selectedDate)),
-    [selectedDate]
+      rawReceipts.filter((r) => r.receiptDate && isSameDay(parseISO(r.receiptDate), selectedDate)),
+    [rawReceipts, selectedDate]
   );
 
   const allReceipts = useMemo(
-    () => (filteredReceipts.length > 0 ? filteredReceipts : MOCK_RECEIPTS),
-    [filteredReceipts]
+    () => (filteredReceipts.length > 0 ? filteredReceipts : rawReceipts),
+    [filteredReceipts, rawReceipts]
   );
 
   return (
     <div className="px-4 pt-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between animate-fade-in-up">
-        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
-          {MOCK_USER.initials}
-        </div>
+        {user ? (
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
+            {user.initials || "OP"}
+          </div>
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"></div>
+        )}
         <h1 className="text-lg font-bold">Expenses</h1>
         <button className="relative p-2 rounded-xl hover:bg-muted transition-colors" aria-label="Notifications">
           <Bell className="h-5 w-5 text-muted-foreground" />
@@ -54,7 +67,9 @@ export default function ReceiptsPage() {
       <div className="grid grid-cols-2 gap-3 animate-fade-in-up" style={{ animationDelay: "120ms" }}>
         <div className="bg-primary text-white rounded-2xl p-4 relative overflow-hidden">
           <p className="text-xs text-white/70">Total Budget</p>
-          <p className="text-xl font-bold mt-1">{formatCurrency(MOCK_SUMMARY.budget)}</p>
+          <p className="text-xl font-bold mt-1">
+            {summary ? formatCurrency(summary.budget) : "₹0"}
+          </p>
           <p className="text-[10px] text-white/60 mt-1">
             {format(selectedDate, "MMMM yyyy")}
           </p>
@@ -62,7 +77,9 @@ export default function ReceiptsPage() {
         </div>
         <div className="bg-accent text-white rounded-2xl p-4 relative overflow-hidden">
           <p className="text-xs text-white/70">Total Spent</p>
-          <p className="text-xl font-bold mt-1">{formatCurrency(MOCK_SUMMARY.totalSpent)}</p>
+          <p className="text-xl font-bold mt-1">
+            {summary ? formatCurrency(summary.totalSpent) : "₹0"}
+          </p>
           <p className="text-[10px] text-white/60 mt-1">
             {format(selectedDate, "MMMM yyyy")}
           </p>
@@ -72,7 +89,9 @@ export default function ReceiptsPage() {
 
       {/* Receipt List */}
       <div className="space-y-2.5 stagger-children">
-        {allReceipts.length > 0 ? (
+        {pendingReceipts ? (
+          <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin" /></div>
+        ) : allReceipts.length > 0 ? (
           allReceipts.map((receipt) => (
             <ReceiptCard key={receipt.id} receipt={receipt} />
           ))

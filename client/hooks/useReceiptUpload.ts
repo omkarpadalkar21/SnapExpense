@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import type { UploadStep, Receipt } from "@/lib/types";
+import { useUploadReceipt, useCreateReceipt } from "./useApi";
 
 interface UseReceiptUploadReturn {
   step: UploadStep;
@@ -12,7 +13,7 @@ interface UseReceiptUploadReturn {
   statusText: string;
   selectFile: (file: File) => void;
   uploadAndScan: () => Promise<void>;
-  confirmAndSave: () => Promise<void>;
+  confirmAndSave: (data: Partial<Receipt>) => Promise<void>;
   reset: () => void;
 }
 
@@ -23,6 +24,9 @@ export function useReceiptUpload(): UseReceiptUploadReturn {
   const [extractedData, setExtractedData] = useState<Partial<Receipt> | null>(null);
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState("");
+
+  const { mutateAsync: uploadReceipt } = useUploadReceipt();
+  const { mutateAsync: createReceipt } = useCreateReceipt();
 
   const selectFile = useCallback((selectedFile: File) => {
     setFile(selectedFile);
@@ -35,41 +39,31 @@ export function useReceiptUpload(): UseReceiptUploadReturn {
     if (!file) return;
 
     setStep("uploading");
-    setProgress(20);
-    setStatusText("Uploading...");
+    setProgress(30);
+    setStatusText("Uploading and scanning receipt...");
 
-    // Simulate upload progress
-    await new Promise((r) => setTimeout(r, 1000));
-    setProgress(50);
-    setStatusText("Extracting text...");
+    try {
+      const response = await uploadReceipt({ image: file });
+      setProgress(100);
+      setStatusText("Done ✓");
+      setExtractedData(response as Partial<Receipt>);
+      setStep("reviewing");
+    } catch (error) {
+      console.error(error);
+      setStatusText("Failed to upload");
+      setStep("idle");
+    }
+  }, [file, uploadReceipt]);
 
-    await new Promise((r) => setTimeout(r, 1500));
-    setProgress(80);
-    setStatusText("Processing...");
-
-    await new Promise((r) => setTimeout(r, 800));
-    setProgress(100);
-    setStatusText("Done ✓");
-
-    // Simulate extracted data
-    setExtractedData({
-      merchantName: "Scanned Store",
-      category: "Groceries",
-      amount: 0,
-      date: new Date().toISOString().split("T")[0],
-      isVerified: false,
-      ocrConfidence: 0.85,
-      lineItems: [],
-    });
-
-    setStep("reviewing");
-  }, [file]);
-
-  const confirmAndSave = useCallback(async () => {
-    setStep("saved");
-    // In production: POST to /api/receipts
-    await new Promise((r) => setTimeout(r, 500));
-  }, []);
+  const confirmAndSave = useCallback(async (data: Partial<Receipt>) => {
+    try {
+      await createReceipt(data);
+      setStep("saved");
+    } catch (error) {
+      console.error(error);
+      setStatusText("Failed to save receipt");
+    }
+  }, [createReceipt]);
 
   const reset = useCallback(() => {
     if (previewUrl) {

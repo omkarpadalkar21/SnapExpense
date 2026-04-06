@@ -32,6 +32,12 @@ public class ReceiptController {
             @RequestParam(value = "notes", required = false) String notes
     ) throws IOException {
         ReceiptResponse response = receiptService.uploadReceipt(image, categoryId, notes);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping
+    public ResponseEntity<ReceiptResponse> createReceipt(@RequestBody com.cv.SnapExpense.dto.receipt.ReceiptCreateRequest request) {
+        ReceiptResponse response = receiptService.createReceipt(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

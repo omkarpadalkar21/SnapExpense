@@ -2,21 +2,24 @@
 
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
+import { CATEGORIES } from "@/lib/mockData";
+import type { Receipt } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/formatCurrency";
-import { CATEGORIES, MOCK_CATEGORY_SUMMARY } from "@/lib/mockData";
-import type { Receipt } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { useExpensesSummaryCategories } from "@/hooks/useApi";
 
 interface ReceiptCardProps {
   receipt: Receipt;
 }
 
 export function ReceiptCard({ receipt }: ReceiptCardProps) {
-  const cat = CATEGORIES.find((c) => c.name === receipt.category);
-  const catSummary = MOCK_CATEGORY_SUMMARY.find((c) => c.category === receipt.category);
-  const spent = catSummary?.spent || receipt.amount;
+  const cat = CATEGORIES.find((c) => c.name === receipt.category?.name);
+  const { data: categories } = useExpensesSummaryCategories();
+  
+  const catSummary = categories?.find((c) => c.category === receipt.category?.name);
+  const spent = catSummary?.spent || receipt.totalAmount;
   const budget = catSummary?.budget || 5000;
   const ratio = Math.min((spent / budget) * 100, 100);
   const isOver = spent > budget;
@@ -47,7 +50,7 @@ export function ReceiptCard({ receipt }: ReceiptCardProps) {
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {receipt.category} · {format(parseISO(receipt.date), "dd MMM yyyy")}
+            {receipt.category?.name || "Uncategorized"} · {receipt.receiptDate && format(parseISO(receipt.receiptDate), "dd MMM yyyy")}
           </p>
 
           <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">

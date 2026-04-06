@@ -7,6 +7,8 @@ import com.cv.SnapExpense.repository.RefreshTokenRepository;
 import com.cv.SnapExpense.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ public class AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final AuthenticationManager authenticationManager;
 
     @Transactional(rollbackFor = Exception.class)
     public RegistrationResponse register(RegistrationRequest registrationRequest) {
@@ -48,6 +51,13 @@ public class AuthenticationService {
 
     @Transactional(rollbackFor = Exception.class)
     public LoginResponse login(LoginRequest loginRequest) {
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        loginRequest.getEmail(),
+                        loginRequest.getPassword()
+                )
+        );
+
         User user = userRepository.findByEmail(loginRequest.getEmail())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
@@ -63,11 +73,11 @@ public class AuthenticationService {
 
     public void logout(LogoutRequest logoutRequest) {
         RefreshToken refreshToken = refreshTokenRepository.getRefreshTokenByToken(logoutRequest.getRefreshToken())
-                .orElseThrow(() ->  new IllegalArgumentException("Invalid refresh token"));
+                .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
 
         refreshToken.setRevokedAt(LocalDateTime.now());
 
-        
+
     }
 
     @Transactional(rollbackFor = Exception.class)

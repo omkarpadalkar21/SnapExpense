@@ -47,7 +47,6 @@ public class ReceiptServiceImpl implements ReceiptService {
     }
 
     @Override
-    @Transactional
     public ReceiptResponse uploadReceipt(MultipartFile image, Integer categoryId, String notes) throws IOException {
         User user = getCurrentUser();
 
@@ -64,30 +63,10 @@ public class ReceiptServiceImpl implements ReceiptService {
             category = categoryRepository.findById(categoryId).orElseThrow(() -> new IllegalArgumentException("Category not found"));
         }
 
-        Receipt receipt = Receipt.builder()
-                .user(user)
-                .imageUrl(imageUrl)
-                .category(category)
-                .merchantName(receiptOcrResponse.getMerchantName())
-                .totalAmount(receiptOcrResponse.getTotalAmount())
-                .receiptDate(receiptOcrResponse.getReceiptDate() != null
-                        ? LocalDate.parse(receiptOcrResponse.getReceiptDate())
-                        : null)
-                .ocrConfidence(receiptOcrResponse.getOcrConfidence())
-                .isVerified(false)
-                .notes(notes)
-                .items(new ArrayList<>())
-                .build();
-
-// Save first to get the receipt ID
-        receipt = receiptRepository.save(receipt);
-
-// Then map and attach OCR items
+        List<ReceiptItemResponse> itemResponses = new ArrayList<>();
         if (receiptOcrResponse.getItems() != null && !receiptOcrResponse.getItems().isEmpty()) {
-            Receipt finalReceipt = receipt;
-            List<ReceiptItem> items = receiptOcrResponse.getItems().stream()
-                    .map(ocrItem -> ReceiptItem.builder()
-                            .receipt(finalReceipt)
+            itemResponses = receiptOcrResponse.getItems().stream()
+                    .map(ocrItem -> ReceiptItemResponse.builder()
                             .name(ocrItem.getName())
                             .quantity(ocrItem.getQuantity() != null
                                     ? BigDecimal.valueOf(ocrItem.getQuantity())
@@ -95,9 +74,67 @@ public class ReceiptServiceImpl implements ReceiptService {
                             .unitPrice(ocrItem.getUnitPrice() != null
                                     ? BigDecimal.valueOf(ocrItem.getUnitPrice())
                                     : BigDecimal.ZERO)
-                            .totalAmount(ocrItem.getTotalPrice() != null
+                            .totalPrice(ocrItem.getTotalPrice() != null
                                     ? BigDecimal.valueOf(ocrItem.getTotalPrice())
                                     : BigDecimal.ZERO)
+                            .build())
+                    .collect(Collectors.toList());
+        }
+
+        CategoryResponse categoryResponse = null;
+        if (category != null) {
+            categoryResponse = receiptMapper.toReceiptResponse(Receipt.builder().category(category).build()).getCategory();
+        }
+
+        return ReceiptResponse.builder()
+                .imageUrl(imageUrl)
+                .merchantName(receiptOcrResponse.getMerchantName())
+                .totalAmount(receiptOcrResponse.getTotalAmount())
+                .receiptDate(receiptOcrResponse.getReceiptDate() != null
+                        ? LocalDate.parse(receiptOcrResponse.getReceiptDate())
+                        : null)
+                .category(categoryResponse)
+                .items(itemResponses)
+                .ocrConfidence(receiptOcrResponse.getOcrConfidence())
+                .isVerified(false)
+                .notes(notes)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public ReceiptResponse createReceipt(ReceiptCreateRequest request) {
+        User user = getCurrentUser();
+        Category category = null;
+        if (request.getCategoryId() != null) {
+            category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new IllegalArgumentException("Category not found"));
+        }
+
+        Receipt receipt = Receipt.builder()
+                .user(user)
+                .imageUrl(request.getImageUrl())
+                .category(category)
+                .merchantName(request.getMerchantName())
+                .totalAmount(request.getTotalAmount())
+                .receiptDate(request.getReceiptDate())
+                .ocrConfidence(request.getOcrConfidence())
+                .isVerified(true) // Confirmed by user
+                .notes(request.getNotes())
+                .items(new ArrayList<>())
+                .build();
+
+        receipt = receiptRepository.save(receipt);
+
+        if (request.getItems() != null && !request.getItems().isEmpty()) {
+            Receipt finalReceipt = receipt;
+            List<ReceiptItem> items = request.getItems().stream()
+                    .map(itemReq -> ReceiptItem.builder()
+                            .receipt(finalReceipt)
+                            .name(itemReq.getName())
+                            .quantity(itemReq.getQuantity())
+                            .unitPrice(itemReq.getUnitPrice())
+                            .totalAmount(itemReq.getTotalPrice())
                             .build())
                     .collect(Collectors.toList());
             receipt.setItems(items);
