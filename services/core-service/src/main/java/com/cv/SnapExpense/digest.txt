@@ -1,0 +1,2602 @@
+Directory structure:
+└── SnapExpense/
+    ├── SnapExpenseApplication.java
+    ├── config/
+    │   └── S3Config.java
+    ├── controller/
+    │   ├── AuthenticationController.java
+    │   ├── BudgetController.java
+    │   ├── ExpensesController.java
+    │   ├── ReceiptController.java
+    │   └── UserProfileController.java
+    ├── dto/
+    │   ├── CategoryBreakdown.java
+    │   ├── CategoryExpensesSummary.java
+    │   ├── ExpensesSummary.java
+    │   ├── GetBudgetResponse.java
+    │   ├── LoginRequest.java
+    │   ├── LoginResponse.java
+    │   ├── LogoutRequest.java
+    │   ├── NewAccessTokenRequest.java
+    │   ├── NewAccessTokenResponse.java
+    │   ├── ReceiptItem.java
+    │   ├── ReceiptOcrResponse.java
+    │   ├── RegistrationRequest.java
+    │   ├── RegistrationResponse.java
+    │   ├── SetBudgetRequest.java
+    │   ├── SetBudgetResponse.java
+    │   ├── SpendingTrendDTO.java
+    │   ├── SpendingTrendRow.java
+    │   ├── UserProfileDto.java
+    │   ├── UserProfileUpdateDto.java
+    │   └── receipt/
+    │       ├── CategoryResponse.java
+    │       ├── PageResponse.java
+    │       ├── ReceiptItemRequest.java
+    │       ├── ReceiptItemResponse.java
+    │       ├── ReceiptResponse.java
+    │       ├── ReceiptUpdateRequest.java
+    │       └── ReceiptVerificationResponse.java
+    ├── exception/
+    │   └── UnauthorizedException.java
+    ├── mapper/
+    │   ├── BudgetMapper.java
+    │   └── ReceiptMapper.java
+    ├── model/
+    │   ├── Category.java
+    │   ├── MonthlyBudget.java
+    │   ├── Receipt.java
+    │   ├── ReceiptItem.java
+    │   ├── RefreshToken.java
+    │   └── User.java
+    ├── repository/
+    │   ├── CategoryRepository.java
+    │   ├── MonthlyBudgetRepository.java
+    │   ├── ReceiptItemRepository.java
+    │   ├── ReceiptRepository.java
+    │   ├── RefreshTokenRepository.java
+    │   └── UserRepository.java
+    ├── security/
+    │   ├── BeanConfig.java
+    │   ├── JwtFilter.java
+    │   └── SecurityConfig.java
+    └── service/
+        ├── AuthenticationService.java
+        ├── BudgetService.java
+        ├── CurrentUserService.java
+        ├── ExpensesService.java
+        ├── FastAPIService.java
+        ├── JwtService.java
+        ├── ReceiptService.java
+        ├── S3Service.java
+        ├── UserProfileService.java
+        └── impl/
+            ├── BudgetServiceImpl.java
+            ├── ExpensesServiceImpl.java
+            ├── ReceiptServiceImpl.java
+            ├── S3ServiceImpl.java
+            └── UserProfileServiceImpl.java
+
+================================================
+FILE: SnapExpenseApplication.java
+================================================
+package com.cv.SnapExpense;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+
+@SpringBootApplication
+@EnableJpaAuditing
+public class SnapExpenseApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(SnapExpenseApplication.class, args);
+	}
+
+}
+
+
+
+================================================
+FILE: config/S3Config.java
+================================================
+package com.cv.SnapExpense.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+
+import java.net.URI;
+
+@Configuration
+public class S3Config {
+    @Value("${cloud.aws.credentials.access-key}")
+    private String accessKey;
+
+    @Value("${cloud.aws.credentials.secret-key}")
+    private String secretKey;
+
+    @Value("${cloud.aws.region}")
+    private String region;
+
+    @Value("${cloud.aws.s3.endpoint}")
+    private String endpoint;
+
+    @Bean
+    public S3Client s3Client() {
+        return S3Client.builder()
+                .region(Region.of(region))
+                .credentialsProvider(getCredentials())
+                .endpointOverride(URI.create(endpoint))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(true)
+                        .build())
+                .build();
+    }
+
+    @Bean
+    public S3Presigner s3Presigner() {
+        return S3Presigner.builder()
+                .region(Region.of("auto"))
+                .credentialsProvider(getCredentials())
+                .endpointOverride(URI.create(endpoint))
+                .build();
+    }
+
+    private StaticCredentialsProvider getCredentials() {
+        return StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey));
+    }
+}
+
+
+
+================================================
+FILE: controller/AuthenticationController.java
+================================================
+package com.cv.SnapExpense.controller;
+
+import com.cv.SnapExpense.dto.LoginRequest;
+import com.cv.SnapExpense.dto.LoginResponse;
+import com.cv.SnapExpense.dto.RegistrationRequest;
+import com.cv.SnapExpense.dto.RegistrationResponse;
+import com.cv.SnapExpense.service.AuthenticationService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/auth")
+@RequiredArgsConstructor
+public class AuthenticationController {
+
+    private final AuthenticationService authenticationService;
+
+    @PostMapping("/register")
+    public ResponseEntity<RegistrationResponse> register(@RequestBody @Valid RegistrationRequest registrationRequest) {
+        return new ResponseEntity<>(
+                authenticationService.register(registrationRequest),
+                HttpStatus.CREATED
+        );
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest loginRequest) {
+        return ResponseEntity.ok().body(authenticationService.login(loginRequest));
+    }
+
+
+}
+
+
+
+
+================================================
+FILE: controller/BudgetController.java
+================================================
+package com.cv.SnapExpense.controller;
+
+import com.cv.SnapExpense.dto.GetBudgetResponse;
+import com.cv.SnapExpense.dto.SetBudgetRequest;
+import com.cv.SnapExpense.dto.SetBudgetResponse;
+import com.cv.SnapExpense.service.BudgetService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.YearMonth;
+import java.util.List;
+
+@RequestMapping("/api/budgets")
+@RestController
+@RequiredArgsConstructor
+public class BudgetController {
+    private final BudgetService budgetService;
+
+    @GetMapping
+    public ResponseEntity<List<GetBudgetResponse>> getBudgetByMonth(@RequestParam(required = false) YearMonth month) {
+        if (month == null) {
+            month = YearMonth.now();
+        }
+        return ResponseEntity.ok().body(budgetService.getBudgetByMonth(month));
+    }
+
+    @PutMapping
+    public ResponseEntity<SetBudgetResponse> setBudgetByMonth(@RequestBody SetBudgetRequest setBudgetRequest) {
+        return ResponseEntity.ok().body(budgetService.setBudgetByMonth(setBudgetRequest));
+    }
+}
+
+
+
+
+================================================
+FILE: controller/ExpensesController.java
+================================================
+package com.cv.SnapExpense.controller;
+
+import com.cv.SnapExpense.dto.CategoryExpensesSummary;
+import com.cv.SnapExpense.dto.ExpensesSummary;
+import com.cv.SnapExpense.service.ExpensesService;
+import com.cv.SnapExpense.dto.SpendingTrendDTO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.YearMonth;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/expenses")
+@RequiredArgsConstructor
+public class ExpensesController {
+    private final ExpensesService expensesService;
+
+    @GetMapping("/summary")
+    public ResponseEntity<ExpensesSummary> getExpenses(@RequestParam(required = false) YearMonth month) {
+        if (month == null) {
+            month = YearMonth.now();
+        }
+        return ResponseEntity.ok().body(expensesService.getExpenses(month));
+    }
+
+    @GetMapping("/summary/categories")
+    public ResponseEntity<List<CategoryExpensesSummary>> getExpensesByCategories(@RequestParam(required = false) YearMonth month) {
+        if (month == null) {
+            month = YearMonth.now();
+        }
+        return ResponseEntity.ok().body(expensesService.getExpensesByCategories(month));
+    }
+
+    @GetMapping("/trend")
+    public ResponseEntity<List<SpendingTrendDTO>> getSpendingTrend(@RequestParam(required = false, defaultValue = "6") Integer months) {
+        if (months > 12) {
+            months = 12;
+        }
+        return ResponseEntity.ok().body(expensesService.getSpendingTrend(months));
+    }
+
+}
+
+
+
+================================================
+FILE: controller/ReceiptController.java
+================================================
+package com.cv.SnapExpense.controller;
+
+import com.cv.SnapExpense.dto.receipt.PageResponse;
+import com.cv.SnapExpense.dto.receipt.ReceiptResponse;
+import com.cv.SnapExpense.dto.receipt.ReceiptUpdateRequest;
+import com.cv.SnapExpense.dto.receipt.ReceiptVerificationResponse;
+import com.cv.SnapExpense.service.ReceiptService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/receipts")
+@RequiredArgsConstructor
+public class ReceiptController {
+
+    private final ReceiptService receiptService;
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ReceiptResponse> uploadReceipt(
+            @RequestParam("image") MultipartFile image,
+            @RequestParam(value = "categoryId", required = false) Integer categoryId,
+            @RequestParam(value = "notes", required = false) String notes
+    ) throws IOException {
+        ReceiptResponse response = receiptService.uploadReceipt(image, categoryId, notes);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping
+    public ResponseEntity<PageResponse<ReceiptResponse>> getReceipts(
+            @RequestParam(value = "month", required = false) String month,
+            @RequestParam(value = "categoryId", required = false) Integer categoryId,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "sort", defaultValue = "receiptDate,desc") String sort
+    ) {
+        String[] sortParams = sort.split(",");
+        Sort.Direction direction = sortParams.length > 1 && sortParams[1].equalsIgnoreCase("desc") ?
+                Sort.Direction.DESC : Sort.Direction.ASC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParams[0]));
+
+        PageResponse<ReceiptResponse> response = receiptService.getReceipts(month, categoryId, pageable);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ReceiptResponse> getReceiptById(@PathVariable UUID id) {
+        return ResponseEntity.ok(receiptService.getReceiptById(id));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ReceiptResponse> updateReceipt(
+            @PathVariable UUID id,
+            @RequestBody ReceiptUpdateRequest request
+    ) {
+        return ResponseEntity.ok(receiptService.updateReceipt(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteReceipt(@PathVariable UUID id) {
+        receiptService.deleteReceipt(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/verify")
+    public ResponseEntity<ReceiptVerificationResponse> verifyReceipt(@PathVariable UUID id) {
+        return ResponseEntity.ok(receiptService.verifyReceipt(id));
+    }
+}
+
+
+
+================================================
+FILE: controller/UserProfileController.java
+================================================
+package com.cv.SnapExpense.controller;
+
+import com.cv.SnapExpense.dto.UserProfileDto;
+import com.cv.SnapExpense.dto.UserProfileUpdateDto;
+import com.cv.SnapExpense.service.UserProfileService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/user/profile")
+@RequiredArgsConstructor
+public class UserProfileController {
+
+    private final UserProfileService userProfileService;
+
+    @GetMapping
+    public ResponseEntity<UserProfileDto> getUserProfile() {
+        return ResponseEntity.ok().body(userProfileService.getUserProfile());
+    }
+
+    @PutMapping
+    public ResponseEntity<UserProfileDto> updateUserProfile(@RequestBody UserProfileUpdateDto updateDto) {
+        return ResponseEntity.ok().body(userProfileService.updateUserProfile(updateDto));
+    }
+
+    @DeleteMapping
+    public ResponseEntity<Void> deleteUserProfile() {
+        userProfileService.deleteUserProfile();
+        return ResponseEntity.noContent().build();
+    }
+
+
+}
+
+
+
+================================================
+FILE: dto/CategoryBreakdown.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import java.math.BigDecimal;
+
+public interface CategoryBreakdown {
+    String getCategory();
+    BigDecimal getSpent();
+    Long getReceiptCount();
+    BigDecimal getBudget();
+}
+
+
+================================================
+FILE: dto/CategoryExpensesSummary.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import com.cv.SnapExpense.model.Category;
+import lombok.Builder;
+
+import java.math.BigDecimal;
+import java.time.YearMonth;
+
+@Builder
+public class CategoryExpensesSummary {
+    YearMonth month;
+    Category category;
+    BigDecimal totalSpend;
+    BigDecimal totalBudget;
+    BigDecimal remainingBudget;
+    Integer receiptCount;
+    BigDecimal percentUsed;
+}
+
+
+
+================================================
+FILE: dto/ExpensesSummary.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.YearMonth;
+
+@Data
+@Builder
+public class ExpensesSummary {
+    YearMonth month;
+    BigDecimal totalSpend;
+    BigDecimal totalBudget;
+    BigDecimal remainingBudget;
+    Integer receiptCount;
+    BigDecimal percentUsed;
+}
+
+
+
+================================================
+FILE: dto/GetBudgetResponse.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.YearMonth;
+
+@Data
+@Builder
+public class GetBudgetResponse {
+    private Integer categoryId;
+    private String categoryName;
+    private YearMonth month;
+    private BigDecimal budget;
+}
+
+
+
+================================================
+FILE: dto/LoginRequest.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+
+@Data
+public class LoginRequest {
+    @Email(message = "The email should be of valid format")
+    @NotBlank(message = "Email is required")
+    @NotNull(message = "Email is required")
+    private String email;
+
+    @Size(min = 8, message = "The password must be minimum {min} characters long")
+    @NotBlank(message = "Password is required")
+    @NotNull(message = "Password is required")
+    private String password;
+}
+
+
+
+================================================
+FILE: dto/LoginResponse.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class LoginResponse {
+    private String accessToken;
+    private String refreshToken;
+    private String expiresIn;
+}
+
+
+
+================================================
+FILE: dto/LogoutRequest.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+@Data
+public class LogoutRequest {
+    @NotBlank(message = "Access Token is required")
+    @NotNull(message = "Access Token is required")
+    private String accessToken;
+
+    @NotBlank(message = "Refresh Token is required")
+    @NotNull(message = "Refresh Token is required")
+    private String refreshToken;
+}
+
+
+
+================================================
+FILE: dto/NewAccessTokenRequest.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+@Data
+public class NewAccessTokenRequest {
+
+    @Email(message = "The email should be of valid format")
+    @NotBlank(message = "Email is required")
+    @NotNull(message = "Email is required")
+    private String email;
+
+    @NotNull(message = "Access token is required")
+    @NotBlank(message = "Access token is required")
+    private String refreshToken;
+}
+
+
+
+================================================
+FILE: dto/NewAccessTokenResponse.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class NewAccessTokenResponse {
+    private String accessToken;
+    private String expiresIn;
+}
+
+
+
+================================================
+FILE: dto/ReceiptItem.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Data;
+
+@Data
+public class ReceiptItem {
+    private String name;
+    private Double quantity;
+    private Double unitPrice;
+    private Double totalPrice;
+}
+
+
+
+================================================
+FILE: dto/ReceiptOcrResponse.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+@Data
+public class ReceiptOcrResponse {
+    private String merchantName;
+    private BigDecimal totalAmount;
+    private String receiptDate;
+    private List<ReceiptItem> items;
+    private String ocrRawText;
+    private BigDecimal ocrConfidence;
+}
+
+
+
+================================================
+FILE: dto/RegistrationRequest.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+
+@Data
+public class RegistrationRequest {
+
+    @Size(min = 2, message = "The name should be minimum {min} characters long")
+    @NotBlank(message = "Name is required")
+    @NotNull(message = "Name is required")
+    private String name;
+
+    @Email(message = "The email should be of valid format")
+    @NotBlank(message = "Email is required")
+    @NotNull(message = "Email is required")
+    private String email;
+
+    @Size(min = 8, message = "The password must be minimum {min} characters long")
+    @NotBlank(message = "Password is required")
+    @NotNull(message = "Password is required")
+    private String password;
+}
+
+
+
+================================================
+FILE: dto/RegistrationResponse.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class RegistrationResponse {
+    private String id;
+    private String name;
+    private String email;
+    private String accessToken;
+    private String refreshToken;
+}
+
+
+
+================================================
+FILE: dto/SetBudgetRequest.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.YearMonth;
+import java.util.List;
+
+@Data
+public class SetBudgetRequest {
+    private YearMonth month;
+    private List<BudgetEntry> budgets;
+
+    @Data
+    public static class BudgetEntry {
+        private Integer categoryId;
+        private BigDecimal budget;
+    }
+}
+
+
+
+================================================
+FILE: dto/SetBudgetResponse.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.time.YearMonth;
+
+@Data
+@Builder
+public class SetBudgetResponse {
+    private YearMonth month;
+    private Integer updated;
+}
+
+
+
+================================================
+FILE: dto/SpendingTrendDTO.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+import java.math.BigDecimal;
+
+@Data
+@AllArgsConstructor
+public class SpendingTrendDTO {
+    private String month;
+    private BigDecimal totalSpent;
+}
+
+
+
+================================================
+FILE: dto/SpendingTrendRow.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import java.math.BigDecimal;
+
+public interface SpendingTrendRow {
+    String getMonth();
+
+    BigDecimal getTotalSpent();
+}
+
+
+
+================================================
+FILE: dto/UserProfileDto.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class UserProfileDto {
+    private String id;
+    private String name;
+    private String email;
+    private String createdAt;
+}
+
+
+
+================================================
+FILE: dto/UserProfileUpdateDto.java
+================================================
+package com.cv.SnapExpense.dto;
+
+import lombok.Data;
+
+@Data
+public class UserProfileUpdateDto {
+    private String name;
+}
+
+
+
+================================================
+FILE: dto/receipt/CategoryResponse.java
+================================================
+package com.cv.SnapExpense.dto.receipt;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class CategoryResponse {
+    private Integer id;
+    private String name;
+}
+
+
+
+================================================
+FILE: dto/receipt/PageResponse.java
+================================================
+package com.cv.SnapExpense.dto.receipt;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.util.List;
+
+@Data
+@Builder
+public class PageResponse<T> {
+    private List<T> content;
+    private int page;
+    private int size;
+    private long totalElements;
+    private int totalPages;
+}
+
+
+
+================================================
+FILE: dto/receipt/ReceiptItemRequest.java
+================================================
+package com.cv.SnapExpense.dto.receipt;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+
+@Data
+public class ReceiptItemRequest {
+    private String name;
+    private BigDecimal quantity;
+    private BigDecimal unitPrice;
+    private BigDecimal totalPrice;
+}
+
+
+
+================================================
+FILE: dto/receipt/ReceiptItemResponse.java
+================================================
+package com.cv.SnapExpense.dto.receipt;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Data
+@Builder
+public class ReceiptItemResponse {
+    private UUID id;
+    private String name;
+    private BigDecimal quantity;
+    private BigDecimal unitPrice;
+    private BigDecimal totalPrice;
+}
+
+
+
+================================================
+FILE: dto/receipt/ReceiptResponse.java
+================================================
+package com.cv.SnapExpense.dto.receipt;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+@Data
+@Builder
+public class ReceiptResponse {
+    private UUID id;
+    private String imageUrl;
+    private String merchantName;
+    private BigDecimal totalAmount;
+    private LocalDate receiptDate;
+    private CategoryResponse category;
+    private List<ReceiptItemResponse> items;
+    private BigDecimal ocrConfidence;
+    private Boolean isVerified;
+    private String notes;
+    private LocalDateTime createdAt;
+}
+
+
+
+================================================
+FILE: dto/receipt/ReceiptUpdateRequest.java
+================================================
+package com.cv.SnapExpense.dto.receipt;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+
+@Data
+public class ReceiptUpdateRequest {
+    private String merchantName;
+    private BigDecimal totalAmount;
+    private LocalDate receiptDate;
+    private Integer categoryId;
+    private String notes;
+    private List<ReceiptItemRequest> items;
+}
+
+
+
+================================================
+FILE: dto/receipt/ReceiptVerificationResponse.java
+================================================
+package com.cv.SnapExpense.dto.receipt;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.util.UUID;
+
+@Data
+@Builder
+public class ReceiptVerificationResponse {
+    private UUID id;
+    private Boolean isVerified;
+}
+
+
+
+================================================
+FILE: exception/UnauthorizedException.java
+================================================
+package com.cv.SnapExpense.exception;
+
+public class UnauthorizedException extends RuntimeException {
+    public UnauthorizedException(String message) {
+        super(message);
+    }
+}
+
+
+
+================================================
+FILE: mapper/BudgetMapper.java
+================================================
+package com.cv.SnapExpense.mapper;
+
+import com.cv.SnapExpense.dto.GetBudgetResponse;
+import com.cv.SnapExpense.model.MonthlyBudget;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+
+@Mapper(componentModel = "spring")
+public interface BudgetMapper {
+
+    @Mapping(target = "categoryId", source = "category.id")
+    @Mapping(target = "categoryName", source = "category.name")
+    GetBudgetResponse toGetBudgetResponse(MonthlyBudget budget);
+}
+
+
+
+================================================
+FILE: mapper/ReceiptMapper.java
+================================================
+package com.cv.SnapExpense.mapper;
+
+import com.cv.SnapExpense.dto.receipt.CategoryResponse;
+import com.cv.SnapExpense.dto.receipt.ReceiptItemResponse;
+import com.cv.SnapExpense.dto.receipt.ReceiptResponse;
+import com.cv.SnapExpense.model.Category;
+import com.cv.SnapExpense.model.Receipt;
+import com.cv.SnapExpense.model.ReceiptItem;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+
+
+@Mapper(componentModel = "spring")
+public interface ReceiptMapper {
+
+    @Mapping(target = "totalPrice", source = "totalAmount")
+    ReceiptItemResponse toReceiptItemResponse(ReceiptItem item);
+
+    CategoryResponse toCategoryResponse(Category category);
+
+    ReceiptResponse toReceiptResponse(Receipt receipt);
+}
+
+
+
+================================================
+FILE: model/Category.java
+================================================
+package com.cv.SnapExpense.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "categories")
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Category {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    @Column(nullable = false, unique = true, length = 50)
+    private String name;
+}
+
+
+
+================================================
+FILE: model/MonthlyBudget.java
+================================================
+package com.cv.SnapExpense.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.YearMonth;
+
+@Entity
+@Table(
+        name = "monthly_budgets",
+        indexes = {
+                @Index(name = "idx_budgets_user_month", columnList = "user_id, month")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uq_budget_user_category_month",
+                        columnNames = {"user_id", "category_id", "month"}
+                )
+        }
+)
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class MonthlyBudget {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", referencedColumnName = "id")
+    private User user;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", referencedColumnName = "id")
+    private Category category;
+
+    @Column(nullable = false)
+    private YearMonth month;
+
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal budget;
+}
+
+
+
+================================================
+FILE: model/Receipt.java
+================================================
+package com.cv.SnapExpense.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.validator.constraints.URL;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+@Entity
+@Table(
+        name = "receipts",
+        indexes = {
+                @Index(name = "idx_receipts_user_date", columnList = "user_id, receipt_date"),
+                @Index(name = "idx_receipts_user_cat", columnList = "user_id, category_id")
+        }
+)
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class Receipt {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", referencedColumnName = "id")
+    private User user;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", referencedColumnName = "id")
+    private Category category;
+
+    @URL
+    @Column(length = 500, nullable = false)
+    private String imageUrl;
+
+    private String merchantName;
+
+    @Column(precision = 10, scale = 2, nullable = false)
+    private BigDecimal totalAmount;
+
+    @Column
+    private LocalDate receiptDate;
+
+    @OneToMany(mappedBy = "receipt", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<ReceiptItem> items = new ArrayList<>();
+
+    @Column(columnDefinition = "TEXT")
+    private String ocrText;
+
+    @Column(precision = 4, scale = 3)
+    private BigDecimal ocrConfidence;
+
+    @Builder.Default
+    private Boolean isVerified = false;
+
+    @Column(length = 500)
+    private String notes;
+
+    @CreatedDate
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+}
+
+
+
+================================================
+FILE: model/ReceiptItem.java
+================================================
+package com.cv.SnapExpense.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Entity
+@Table(
+        name = "receipt_items",
+        indexes = {
+                @Index(name = "idx_receipt_items_receipt", columnList = "receipt_id")
+        }
+)
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ReceiptItem {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
+    @JoinColumn(name = "receipt_id", nullable = false)
+    private Receipt receipt;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Builder.Default
+    @Column(precision = 6, scale = 2)
+    private BigDecimal quantity = BigDecimal.ONE;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal unitPrice;
+
+    @Column(precision = 10, scale = 2, nullable = false)
+    private BigDecimal totalAmount;
+}
+
+
+
+================================================
+FILE: model/RefreshToken.java
+================================================
+package com.cv.SnapExpense.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(
+        name = "refresh_tokens", indexes = {
+        @Index(name = "idx_refresh_tokens_user_id", columnList = "user_id"),
+        @Index(name = "idx_refresh_tokens_token", columnList = "token"),
+        @Index(name = "idx_refresh_tokens_expires_at", columnList = "expires_at")
+})
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class RefreshToken {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Column(name = "token", length = 500, unique = true, nullable = false)
+    private String token;
+
+    @Column(name = "expires_at", nullable = false)
+    private LocalDateTime expiresAt;
+
+    @Column(name = "revoked_at")
+    private LocalDateTime revokedAt;
+
+    @CreatedDate
+    @Column(name = "created_at", updatable = false, nullable = false)
+    private LocalDateTime createdAt;
+}
+
+
+
+================================================
+FILE: model/User.java
+================================================
+package com.cv.SnapExpense.model;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+
+@Entity
+@Table(name = "users")
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class User implements UserDetails {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @Column(nullable = false, length = 100)
+    private String name;
+
+    @Email
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column(nullable = false)
+    private String password;
+
+    @CreatedDate
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of();
+    }
+
+    @Override
+    public String getUsername() {
+        return email;
+    }
+}
+
+
+
+================================================
+FILE: repository/CategoryRepository.java
+================================================
+package com.cv.SnapExpense.repository;
+
+import com.cv.SnapExpense.model.Category;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface CategoryRepository extends JpaRepository<Category, Integer> {
+}
+
+
+================================================
+FILE: repository/MonthlyBudgetRepository.java
+================================================
+package com.cv.SnapExpense.repository;
+
+import com.cv.SnapExpense.model.MonthlyBudget;
+import com.cv.SnapExpense.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.time.YearMonth;
+import java.util.List;
+
+public interface MonthlyBudgetRepository extends JpaRepository<MonthlyBudget, Integer> {
+    List<MonthlyBudget> findAllByUserAndMonth(User user, YearMonth month);
+}
+
+
+================================================
+FILE: repository/ReceiptItemRepository.java
+================================================
+package com.cv.SnapExpense.repository;
+
+import com.cv.SnapExpense.model.ReceiptItem;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.UUID;
+
+public interface ReceiptItemRepository extends JpaRepository<ReceiptItem, UUID> {
+}
+
+
+================================================
+FILE: repository/ReceiptRepository.java
+================================================
+package com.cv.SnapExpense.repository;
+
+import com.cv.SnapExpense.dto.SpendingTrendRow;
+import com.cv.SnapExpense.model.Receipt;
+import com.cv.SnapExpense.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+public interface ReceiptRepository extends JpaRepository<Receipt, UUID> {
+
+    @Query("""
+                SELECT SUM(r.totalAmount), COUNT(r),
+                       COALESCE(SUM(mb.budget), 0)
+                FROM Receipt r
+                LEFT JOIN MonthlyBudget mb
+                    ON mb.user = r.user
+                    AND mb.month = :monthStart
+                WHERE r.user = :user
+                    AND r.receiptDate >= :monthStart
+                    AND r.receiptDate < :monthEnd
+            """)
+    Object[] getMonthlySummary(
+            @Param("user") User user,
+            @Param("monthStart") LocalDate monthStart,
+            @Param("monthEnd") LocalDate monthEnd
+    );
+
+    @Query("""
+                SELECT r.category,
+                       SUM(r.totalAmount)     AS spent,
+                       COUNT(r)               AS receiptCount,
+                       COALESCE(mb.budget, 0) AS budget
+                FROM Receipt r
+                LEFT JOIN MonthlyBudget mb
+                    ON mb.user = r.user
+                    AND mb.category = r.category
+                    AND mb.month = :monthStart
+                WHERE r.user = :user
+                    AND r.receiptDate >= :monthStart
+                    AND r.receiptDate < :monthEnd
+                GROUP BY r.category, mb.budget
+                ORDER BY spent DESC
+            """)
+    List<Object[]> getMonthlyCategoryBreakdown(
+            @Param("user") User user,
+            @Param("monthStart") LocalDate monthStart,
+            @Param("monthEnd") LocalDate monthEnd
+    );
+
+    @Query(value = """
+        SELECT TO_CHAR(r.receipt_date, 'YYYY-MM') AS month,
+               COALESCE(SUM(r.total_amount), 0)   AS total_spent
+        FROM receipts r
+        WHERE r.user_id = :userId
+            AND r.receipt_date >= :from
+        GROUP BY TO_CHAR(r.receipt_date, 'YYYY-MM')
+        ORDER BY month ASC
+        """, nativeQuery = true)
+    List<SpendingTrendRow> getSpendingTrend(
+            @Param("userId") UUID userId,
+            @Param("from") LocalDate from
+    );
+}
+
+
+================================================
+FILE: repository/RefreshTokenRepository.java
+================================================
+package com.cv.SnapExpense.repository;
+
+import com.cv.SnapExpense.model.RefreshToken;
+import com.cv.SnapExpense.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID> {
+    Optional<RefreshToken> getRefreshTokenByToken(String token);
+
+    Optional<RefreshToken> getRefreshTokenByUserAndExpiresAtAfter(User user, LocalDateTime expiresAtAfter);
+}
+
+
+================================================
+FILE: repository/UserRepository.java
+================================================
+package com.cv.SnapExpense.repository;
+
+import com.cv.SnapExpense.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+import java.util.UUID;
+
+public interface UserRepository extends JpaRepository<User, UUID> {
+    Optional<User> findByEmail(String userEmail);
+}
+
+
+================================================
+FILE: security/BeanConfig.java
+================================================
+package com.cv.SnapExpense.security;
+
+import com.cv.SnapExpense.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+@Configuration
+@RequiredArgsConstructor
+public class BeanConfig {
+
+    private final UserRepository userRepository;
+
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return userEmail -> userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    }
+
+    @Bean
+    public AuthenticationProvider authenticationProvider(PasswordEncoder passwordEncoder) {
+        DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider(userDetailsService());
+        authenticationProvider.setPasswordEncoder(passwordEncoder);
+        return authenticationProvider;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+        return authenticationConfiguration.getAuthenticationManager();
+    }
+}
+
+
+
+================================================
+FILE: security/JwtFilter.java
+================================================
+package com.cv.SnapExpense.security;
+
+import com.cv.SnapExpense.service.JwtService;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class JwtFilter extends OncePerRequestFilter {
+
+    private final JwtService jwtService;
+    private final UserDetailsService userDetailsService;
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain)
+            throws ServletException, IOException {
+
+        final String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        try {
+            String jwt = authHeader.substring(7);
+            String userEmail = jwtService.extractUsername(jwt);
+
+            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
+
+                if (jwtService.isTokenValid(jwt, userDetails)) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error processing JWT token: {}", e.getMessage());
+        }
+
+        filterChain.doFilter(request, response);
+    }
+}
+
+
+
+================================================
+FILE: security/SecurityConfig.java
+================================================
+package com.cv.SnapExpense.security;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+public class SecurityConfig {
+    private final JwtFilter jwtFilter;
+    private final AuthenticationProvider authenticationProvider;
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+        return httpSecurity
+                .cors(Customizer.withDefaults())
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(req ->
+                        req.requestMatchers("/api/auth/**")
+                                .permitAll()
+                                .anyRequest()
+                                .authenticated()
+                )
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authenticationProvider(authenticationProvider)
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
+    }
+}
+
+
+
+================================================
+FILE: service/AuthenticationService.java
+================================================
+package com.cv.SnapExpense.service;
+
+import com.cv.SnapExpense.dto.*;
+import com.cv.SnapExpense.model.RefreshToken;
+import com.cv.SnapExpense.model.User;
+import com.cv.SnapExpense.repository.RefreshTokenRepository;
+import com.cv.SnapExpense.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class AuthenticationService {
+
+    @Value("${jwt.access-key.expiration}")
+    private Long accessKeyExpiration;
+
+    private final JwtService jwtService;
+    private final PasswordEncoder passwordEncoder;
+    private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+
+    @Transactional(rollbackFor = Exception.class)
+    public RegistrationResponse register(RegistrationRequest registrationRequest) {
+        User user = User.builder()
+                .name(registrationRequest.getName())
+                .email(registrationRequest.getEmail())
+                .password(passwordEncoder.encode(registrationRequest.getPassword()))
+                .build();
+
+        userRepository.save(user);
+
+        return RegistrationResponse.builder()
+                .id(user.getId().toString())
+                .name(user.getName())
+                .email(user.getEmail())
+                .accessToken(jwtService.generateAccessToken(user))
+                .refreshToken(jwtService.generateRefreshToken(user).getToken())
+                .build();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public LoginResponse login(LoginRequest loginRequest) {
+        User user = userRepository.findByEmail(loginRequest.getEmail())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        RefreshToken refreshToken = refreshTokenRepository.getRefreshTokenByUserAndExpiresAtAfter(user, LocalDateTime.now())
+                .orElseGet(() -> jwtService.generateRefreshToken(user));
+
+        return LoginResponse.builder()
+                .accessToken(jwtService.generateAccessToken(user))
+                .refreshToken(refreshToken.getToken())
+                .expiresIn(refreshToken.getExpiresAt().toString())
+                .build();
+    }
+
+    public void logout(LogoutRequest logoutRequest) {
+        RefreshToken refreshToken = refreshTokenRepository.getRefreshTokenByToken(logoutRequest.getRefreshToken())
+                .orElseThrow(() ->  new IllegalArgumentException("Invalid refresh token"));
+
+        refreshToken.setRevokedAt(LocalDateTime.now());
+
+        
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public NewAccessTokenResponse getNewAccessToken(NewAccessTokenRequest newAccessTokenRequest) {
+        User user = userRepository.findByEmail(newAccessTokenRequest.getEmail())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        boolean isRefreshTokenValid = jwtService.isTokenValid(newAccessTokenRequest.getRefreshToken(), user);
+
+        if (!isRefreshTokenValid) {
+            return null;
+        }
+
+        Optional<RefreshToken> refreshToken = refreshTokenRepository.getRefreshTokenByToken(newAccessTokenRequest.getRefreshToken());
+
+        if (refreshToken.isEmpty() || refreshToken.get().getRevokedAt() != null) {
+            return null;
+        }
+
+        return NewAccessTokenResponse.builder()
+                .accessToken(jwtService.generateAccessToken(user))
+                .expiresIn(accessKeyExpiration.toString())
+                .build();
+    }
+}
+
+
+
+================================================
+FILE: service/BudgetService.java
+================================================
+package com.cv.SnapExpense.service;
+
+import com.cv.SnapExpense.dto.GetBudgetResponse;
+import com.cv.SnapExpense.dto.SetBudgetRequest;
+import com.cv.SnapExpense.dto.SetBudgetResponse;
+
+import java.time.YearMonth;
+import java.util.List;
+
+public interface BudgetService {
+    List<GetBudgetResponse> getBudgetByMonth(YearMonth month);
+
+     SetBudgetResponse setBudgetByMonth(SetBudgetRequest setBudgetRequest);
+}
+
+
+
+================================================
+FILE: service/CurrentUserService.java
+================================================
+package com.cv.SnapExpense.service;
+
+import com.cv.SnapExpense.exception.UnauthorizedException;
+import com.cv.SnapExpense.model.User;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+
+@Component
+public class CurrentUserService {
+
+    public User getCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+        if (auth == null || !(auth.getPrincipal() instanceof User)) {
+            throw new UnauthorizedException("User not found");
+        }
+
+        return (User) auth.getPrincipal();
+    }
+}
+
+
+
+================================================
+FILE: service/ExpensesService.java
+================================================
+package com.cv.SnapExpense.service;
+
+import com.cv.SnapExpense.dto.CategoryExpensesSummary;
+import com.cv.SnapExpense.dto.ExpensesSummary;
+import com.cv.SnapExpense.dto.SpendingTrendDTO;
+
+import java.time.YearMonth;
+import java.util.List;
+
+public interface ExpensesService {
+    ExpensesSummary getExpenses(YearMonth month);
+
+    List<CategoryExpensesSummary> getExpensesByCategories(YearMonth month);
+
+    List<SpendingTrendDTO> getSpendingTrend(Integer months);
+}
+
+
+
+================================================
+FILE: service/FastAPIService.java
+================================================
+package com.cv.SnapExpense.service;
+
+import com.cv.SnapExpense.dto.ReceiptOcrResponse;
+import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Service
+public class FastAPIService {
+    private final WebClient webClient;
+
+    public FastAPIService(WebClient.Builder builder) {
+        this.webClient = builder.baseUrl("http://localhost:8000").build();
+    }
+
+    public ReceiptOcrResponse extractReceiptInfo(String presignedUrl) {
+        Map<String, String> body = new HashMap<>();
+        body.put("presigned_url", presignedUrl);
+
+        return webClient.post()
+                .uri("/ocr/extract")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(ReceiptOcrResponse.class)
+                .block();
+    }
+}
+
+
+
+================================================
+FILE: service/JwtService.java
+================================================
+package com.cv.SnapExpense.service;
+
+import com.cv.SnapExpense.model.RefreshToken;
+import com.cv.SnapExpense.model.User;
+import com.cv.SnapExpense.repository.RefreshTokenRepository;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Service;
+
+import javax.crypto.SecretKey;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Optional;
+import java.util.function.Function;
+
+@Service
+@RequiredArgsConstructor
+public class JwtService {
+    @Value("${jwt.secret.key}")
+    private String secretKey;
+
+    @Value("${jwt.access-key.expiration}")
+    private Long accessKeyExpiration;
+
+    @Value("${jwt.refresh-key.expiration}")
+    private Long refreshKeyExpiration;
+
+    private final RefreshTokenRepository refreshTokenRepository;
+
+    public String extractUsername(String token) {
+        return extractClaims(token, Claims::getSubject);
+    }
+
+    private <T> T extractClaims(String token, Function<Claims, T> claimResolver) {
+        Claims claims = extractAllClaims(token);
+        return claimResolver.apply(claims);
+    }
+
+    private Claims extractAllClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
+    private SecretKey getSigningKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    public String generateAccessToken(UserDetails userDetails) {
+        return buildToken(new HashMap<>(), userDetails, accessKeyExpiration);
+    }
+
+    public RefreshToken generateRefreshToken(UserDetails userDetails) {
+        String token = buildToken(new HashMap<>(), userDetails, refreshKeyExpiration);
+
+        RefreshToken refreshToken = RefreshToken.builder()
+                .user((User) userDetails)
+                .token(token)
+                .expiresAt(LocalDateTime.now().plus(Duration.ofMillis(refreshKeyExpiration)))
+                .build();
+
+        refreshTokenRepository.save(refreshToken);
+
+        return refreshToken;
+    }
+
+    private boolean validateRefreshToken(String token) {
+        Optional<RefreshToken> refreshToken = refreshTokenRepository.getRefreshTokenByToken(token);
+
+        return refreshToken.map(value -> value.getExpiresAt().isAfter(LocalDateTime.now())).orElse(false);
+    }
+
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        String username = extractUsername(token);
+        return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+    }
+
+    private boolean isTokenExpired(String token) {
+        return extractExpiration(token).before(new Date());
+    }
+
+    public Date extractExpiration(String token) {
+        return extractClaims(token, Claims::getExpiration);
+    }
+
+    private String buildToken(
+            HashMap<String, Object> claims,
+            UserDetails userDetails,
+            Long keyExpiration
+    ) {
+        return Jwts.builder()
+                .claims(claims)
+                .subject(userDetails.getUsername())
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + keyExpiration))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+}
+
+
+
+================================================
+FILE: service/ReceiptService.java
+================================================
+package com.cv.SnapExpense.service;
+
+import com.cv.SnapExpense.dto.receipt.PageResponse;
+import com.cv.SnapExpense.dto.receipt.ReceiptResponse;
+import com.cv.SnapExpense.dto.receipt.ReceiptUpdateRequest;
+import com.cv.SnapExpense.dto.receipt.ReceiptVerificationResponse;
+import org.springframework.data.domain.Pageable;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.UUID;
+
+public interface ReceiptService {
+    ReceiptResponse uploadReceipt(MultipartFile image, Integer categoryId, String notes) throws IOException;
+    PageResponse<ReceiptResponse> getReceipts(String month, Integer categoryId, Pageable pageable);
+    ReceiptResponse getReceiptById(UUID id);
+    ReceiptResponse updateReceipt(UUID id, ReceiptUpdateRequest request);
+    void deleteReceipt(UUID id);
+    ReceiptVerificationResponse verifyReceipt(UUID id);
+}
+
+
+
+================================================
+FILE: service/S3Service.java
+================================================
+package com.cv.SnapExpense.service;
+
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+
+public interface S3Service {
+    String uploadReceipt(MultipartFile receipt, String userId) throws IOException;
+
+    String generateGetPresignedUrl(String filePath);
+}
+
+
+
+================================================
+FILE: service/UserProfileService.java
+================================================
+package com.cv.SnapExpense.service;
+
+import com.cv.SnapExpense.dto.UserProfileDto;
+import com.cv.SnapExpense.dto.UserProfileUpdateDto;
+
+public interface UserProfileService {
+    UserProfileDto getUserProfile();
+
+    UserProfileDto updateUserProfile(UserProfileUpdateDto updateDto);
+
+    void deleteUserProfile();
+}
+
+
+
+================================================
+FILE: service/impl/BudgetServiceImpl.java
+================================================
+package com.cv.SnapExpense.service.impl;
+
+import com.cv.SnapExpense.dto.GetBudgetResponse;
+import com.cv.SnapExpense.dto.SetBudgetRequest;
+import com.cv.SnapExpense.dto.SetBudgetResponse;
+import com.cv.SnapExpense.mapper.BudgetMapper;
+import com.cv.SnapExpense.model.MonthlyBudget;
+import com.cv.SnapExpense.model.User;
+import com.cv.SnapExpense.repository.CategoryRepository;
+import com.cv.SnapExpense.repository.MonthlyBudgetRepository;
+import com.cv.SnapExpense.service.BudgetService;
+import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class BudgetServiceImpl implements BudgetService {
+    private final MonthlyBudgetRepository monthlyBudgetRepository;
+    private final BudgetMapper budgetMapper;
+    private final CategoryRepository categoryRepository;
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<GetBudgetResponse> getBudgetByMonth(YearMonth month) {
+        if (month == null) month = YearMonth.now();
+        User user = (User) SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getPrincipal();
+
+        List<MonthlyBudget> budgets = monthlyBudgetRepository.findAllByUserAndMonth(user, month);
+
+        return budgets.stream()
+                .map(budgetMapper::toGetBudgetResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SetBudgetResponse setBudgetByMonth(SetBudgetRequest setBudgetRequest) {
+        if (setBudgetRequest.getMonth() == null) setBudgetRequest.setMonth(YearMonth.now());
+
+        User user = (User) SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getPrincipal();
+
+        List<MonthlyBudget> existingBudgets = monthlyBudgetRepository.findAllByUserAndMonth(user, setBudgetRequest.getMonth());
+        List<MonthlyBudget> monthlyBudgetsToSave = new ArrayList<>();
+
+        for (SetBudgetRequest.BudgetEntry budget : setBudgetRequest.getBudgets()) {
+            MonthlyBudget existing = existingBudgets.stream()
+                    .filter(b -> b.getCategory().getId().equals(budget.getCategoryId()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (existing != null) {
+                existing.setBudget(budget.getBudget());
+                monthlyBudgetsToSave.add(existing);
+            } else {
+                monthlyBudgetsToSave.add(MonthlyBudget.builder()
+                        .user(user)
+                        .category(
+                                categoryRepository
+                                        .findById(budget.getCategoryId())
+                                        .orElseThrow(() -> new EntityNotFoundException("Category not found")))
+                        .month(setBudgetRequest.getMonth())
+                        .budget(budget.getBudget())
+                        .build()
+                );
+            }
+        }
+
+        monthlyBudgetRepository.saveAll(monthlyBudgetsToSave);
+        return SetBudgetResponse.builder()
+                .month(setBudgetRequest.getMonth())
+                .updated(monthlyBudgetsToSave.size())
+                .build();
+    }
+}
+
+
+
+================================================
+FILE: service/impl/ExpensesServiceImpl.java
+================================================
+package com.cv.SnapExpense.service.impl;
+
+import com.cv.SnapExpense.dto.CategoryExpensesSummary;
+import com.cv.SnapExpense.dto.ExpensesSummary;
+import com.cv.SnapExpense.dto.SpendingTrendRow;
+import com.cv.SnapExpense.model.Category;
+import com.cv.SnapExpense.model.User;
+import com.cv.SnapExpense.repository.ReceiptRepository;
+import com.cv.SnapExpense.service.ExpensesService;
+import com.cv.SnapExpense.dto.SpendingTrendDTO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+@Service
+@RequiredArgsConstructor
+public class ExpensesServiceImpl implements ExpensesService {
+
+    private final ReceiptRepository receiptRepository;
+
+    @Override
+    @Transactional(readOnly = true)
+    public ExpensesSummary getExpenses(YearMonth month) {
+        if (month == null) month = YearMonth.now();
+
+        LocalDate from = month.atDay(1);
+        LocalDate to = from.plusMonths(1);
+
+        User user = (User) SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getPrincipal();
+
+        Object[] row = receiptRepository.getMonthlySummary(user, from, to);
+
+        BigDecimal totalSpend = row[0] != null ? (BigDecimal) row[0] : BigDecimal.ZERO;
+        BigDecimal totalBudget = (BigDecimal) row[2];
+        long receiptCount = (Long) row[1];
+
+        BigDecimal percentUsed = totalBudget.compareTo(BigDecimal.ZERO) == 0
+                ? BigDecimal.ZERO
+                : totalSpend.divide(totalBudget, 4, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100));
+
+        return ExpensesSummary.builder()
+                .month(month)
+                .totalSpend(totalSpend)
+                .totalBudget(totalBudget)
+                .remainingBudget(totalBudget.subtract(totalSpend))
+                .receiptCount((int) receiptCount)
+                .percentUsed(percentUsed)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CategoryExpensesSummary> getExpensesByCategories(YearMonth month) {
+        if (month == null) month = YearMonth.now();
+
+        LocalDate from = month.atDay(1);
+        LocalDate to = from.plusMonths(1);
+
+        User user = (User) SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getPrincipal();
+
+        List<Object[]> rows = receiptRepository.getMonthlyCategoryBreakdown(user, from, to);
+
+        if (rows.isEmpty()) return List.of();
+
+        List<CategoryExpensesSummary> summaries = new ArrayList<>();
+
+        for (Object[] row : rows) {
+            // Each row: [Category, spent, receiptCount, budget]
+            Category category = (Category) row[0];
+            BigDecimal spent = row[1] != null ? (BigDecimal) row[1] : BigDecimal.ZERO;
+            long receiptCount = (Long) row[2];
+            BigDecimal budget = (BigDecimal) row[3];
+
+            BigDecimal percentUsed = budget.compareTo(BigDecimal.ZERO) == 0
+                    ? BigDecimal.ZERO
+                    : spent.divide(budget, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100));
+
+            summaries.add(
+                    CategoryExpensesSummary.builder()
+                            .month(month)
+                            .category(category)
+                            .totalSpend(spent)
+                            .totalBudget(budget)
+                            .remainingBudget(budget.subtract(spent))
+                            .receiptCount((int) receiptCount)
+                            .percentUsed(percentUsed)
+                            .build()
+            );
+        }
+
+        return summaries;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SpendingTrendDTO> getSpendingTrend(Integer months) {
+        if (months == null || months < 1) months = 6;
+        if (months > 12) months = 12;
+
+        User user = (User) SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getPrincipal();
+
+        LocalDate from = LocalDate.now()
+                .minusMonths(months - 1)
+                .withDayOfMonth(1);
+
+        List<SpendingTrendRow> rows = receiptRepository
+                .getSpendingTrend(user.getId(), from);
+
+        // Index results by month string for zero-fill lookup
+        Map<String, BigDecimal> spentByMonth = rows.stream()
+                .collect(Collectors.toMap(
+                        SpendingTrendRow::getMonth,
+                        SpendingTrendRow::getTotalSpent
+                ));
+
+        // Generate all months in range, zero-filling missing ones
+        return IntStream.range(0, months)
+                .mapToObj(i -> from.plusMonths(i)
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM")))
+                .map(m -> new SpendingTrendDTO(
+                        m,
+                        spentByMonth.getOrDefault(m, BigDecimal.ZERO)
+                ))
+                .toList();
+    }
+}
+
+
+
+================================================
+FILE: service/impl/ReceiptServiceImpl.java
+================================================
+package com.cv.SnapExpense.service.impl;
+
+import com.cv.SnapExpense.dto.ReceiptOcrResponse;
+import com.cv.SnapExpense.dto.receipt.*;
+import com.cv.SnapExpense.mapper.ReceiptMapper;
+import com.cv.SnapExpense.model.Category;
+import com.cv.SnapExpense.model.Receipt;
+import com.cv.SnapExpense.model.ReceiptItem;
+import com.cv.SnapExpense.model.User;
+import com.cv.SnapExpense.repository.CategoryRepository;
+import com.cv.SnapExpense.repository.ReceiptRepository;
+import com.cv.SnapExpense.repository.UserRepository;
+import com.cv.SnapExpense.service.FastAPIService;
+import com.cv.SnapExpense.service.ReceiptService;
+import com.cv.SnapExpense.service.S3Service;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class ReceiptServiceImpl implements ReceiptService {
+
+    private final ReceiptRepository receiptRepository;
+    private final CategoryRepository categoryRepository;
+    private final UserRepository userRepository;
+    private final ReceiptMapper receiptMapper;
+    private final S3Service s3Service;
+    private final FastAPIService fastAPIService;
+
+    private User getCurrentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    @Override
+    @Transactional
+    public ReceiptResponse uploadReceipt(MultipartFile image, Integer categoryId, String notes) throws IOException {
+        User user = getCurrentUser();
+
+        String filePath = s3Service.uploadReceipt(image, user.getId().toString());
+
+        // TODO: Upload image to S3 and get URL
+        String imageUrl = s3Service.generateGetPresignedUrl(filePath);
+
+        // TODO: Send presigned URL to FastAPI and get extracted data
+        ReceiptOcrResponse receiptOcrResponse = fastAPIService.extractReceiptInfo(imageUrl);
+        // Mocking extracted data for now
+        Category category = null;
+        if (categoryId != null) {
+            category = categoryRepository.findById(categoryId).orElseThrow(() -> new IllegalArgumentException("Category not found"));
+        }
+
+        Receipt receipt = Receipt.builder()
+                .user(user)
+                .imageUrl(imageUrl)
+                .category(category)
+                .merchantName(receiptOcrResponse.getMerchantName())
+                .totalAmount(receiptOcrResponse.getTotalAmount())
+                .receiptDate(receiptOcrResponse.getReceiptDate() != null
+                        ? LocalDate.parse(receiptOcrResponse.getReceiptDate())
+                        : null)
+                .ocrConfidence(receiptOcrResponse.getOcrConfidence())
+                .isVerified(false)
+                .notes(notes)
+                .items(new ArrayList<>())
+                .build();
+
+        receipt = receiptRepository.save(receipt);
+        return receiptMapper.toReceiptResponse(receipt);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<ReceiptResponse> getReceipts(String month, Integer categoryId, Pageable pageable) {
+        // TODO: In a real app, you would filter by month and categoryId using a Specification or a custom Query.
+        // For now, this just retrieves all paginated receipts for the current user.
+        Page<Receipt> page = receiptRepository.findAll(pageable); // Should filter by user
+
+        List<ReceiptResponse> content = page.getContent().stream()
+                .map(receiptMapper::toReceiptResponse)
+                .collect(Collectors.toList());
+
+        return PageResponse.<ReceiptResponse>builder()
+                .content(content)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ReceiptResponse getReceiptById(UUID id) {
+        Receipt receipt = receiptRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Receipt not found"));
+        return receiptMapper.toReceiptResponse(receipt);
+    }
+
+    @Override
+    @Transactional
+    public ReceiptResponse updateReceipt(UUID id, ReceiptUpdateRequest request) {
+        Receipt receipt = receiptRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Receipt not found"));
+
+        receipt.setMerchantName(request.getMerchantName());
+        receipt.setTotalAmount(request.getTotalAmount());
+        receipt.setReceiptDate(request.getReceiptDate());
+        receipt.setNotes(request.getNotes());
+
+        if (request.getCategoryId() != null) {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new RuntimeException("Category not found"));
+            receipt.setCategory(category);
+        }
+
+        if (request.getItems() != null) {
+            receipt.getItems().clear();
+            for (ReceiptItemRequest itemReq : request.getItems()) {
+                ReceiptItem item = ReceiptItem.builder()
+                        .receipt(receipt)
+                        .name(itemReq.getName())
+                        .quantity(itemReq.getQuantity())
+                        .unitPrice(itemReq.getUnitPrice())
+                        .totalAmount(itemReq.getTotalPrice())
+                        .build();
+                receipt.getItems().add(item);
+            }
+        }
+
+        receipt = receiptRepository.save(receipt);
+        return receiptMapper.toReceiptResponse(receipt);
+    }
+
+    @Override
+    @Transactional
+    public void deleteReceipt(UUID id) {
+        receiptRepository.deleteById(id);
+    }
+
+    @Override
+    @Transactional
+    public ReceiptVerificationResponse verifyReceipt(UUID id) {
+        Receipt receipt = receiptRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Receipt not found"));
+
+        receipt.setIsVerified(true);
+        receipt = receiptRepository.save(receipt);
+
+        return ReceiptVerificationResponse.builder()
+                .id(receipt.getId())
+                .isVerified(receipt.getIsVerified())
+                .build();
+    }
+}
+
+
+
+================================================
+FILE: service/impl/S3ServiceImpl.java
+================================================
+package com.cv.SnapExpense.service.impl;
+
+import com.cv.SnapExpense.service.S3Service;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
+
+import java.io.IOException;
+import java.time.Duration;
+
+@Service
+@RequiredArgsConstructor
+public class S3ServiceImpl implements S3Service {
+
+    @Value("${aws.bucket.name}")
+    private String bucketName;
+
+    private final S3Client s3Client;
+    private final S3Presigner s3Presigner;
+
+    @Override
+    public String uploadReceipt(MultipartFile receipt, String userId) throws IOException {
+        String timestamp = String.valueOf(System.currentTimeMillis());
+        String originalFilename = receipt.getOriginalFilename();
+        String fileExtension = originalFilename != null && originalFilename.contains(".") ?
+                originalFilename.substring(originalFilename.lastIndexOf(".")) : "";
+
+        String key = String.format("receipts/%s/%s/receipt%s", userId, timestamp, fileExtension);
+
+        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                .bucket(bucketName)
+                .key(key)
+                .contentType(receipt.getContentType())
+                .contentLength(receipt.getSize())
+                .build();
+
+        s3Client.putObject(putObjectRequest, RequestBody.fromBytes(receipt.getBytes()));
+
+        return key;
+    }
+
+    @Override
+    public String generateGetPresignedUrl(String filePath) {
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(bucketName)
+                .key(filePath)
+                .build();
+
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofMinutes(10))
+                .getObjectRequest(getObjectRequest)
+                .build();
+
+        PresignedGetObjectRequest presignedGetObjectRequest = s3Presigner.presignGetObject(presignRequest);
+        return presignedGetObjectRequest.url().toString();
+    }
+}
+
+
+
+================================================
+FILE: service/impl/UserProfileServiceImpl.java
+================================================
+package com.cv.SnapExpense.service.impl;
+
+import com.cv.SnapExpense.dto.UserProfileDto;
+import com.cv.SnapExpense.dto.UserProfileUpdateDto;
+import com.cv.SnapExpense.model.User;
+import com.cv.SnapExpense.repository.UserRepository;
+import com.cv.SnapExpense.service.CurrentUserService;
+import com.cv.SnapExpense.service.UserProfileService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class UserProfileServiceImpl implements UserProfileService {
+    private final CurrentUserService currentUserService;
+    private final UserRepository userRepository;
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserProfileDto getUserProfile() {
+        User user = currentUserService.getCurrentUser();
+
+        return UserProfileDto.builder()
+                .id(user.getId().toString())
+                .name(user.getName())
+                .email(user.getEmail())
+                .createdAt(user.getCreatedAt().toString())
+                .build();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public UserProfileDto updateUserProfile(UserProfileUpdateDto updateDto) {
+        User user = currentUserService.getCurrentUser();
+
+        if (updateDto == null || updateDto.getName() == null || updateDto.getName().isBlank()) {
+            throw new IllegalArgumentException("Name is required");
+        }
+
+        user.setName(updateDto.getName());
+        user = userRepository.save(user);
+
+        return UserProfileDto.builder()
+                .id(user.getId().toString())
+                .name(user.getName())
+                .email(user.getEmail())
+                .createdAt(user.getCreatedAt().toString())
+                .build();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteUserProfile() {
+        User user = currentUserService.getCurrentUser();
+        userRepository.delete(user);
+    }
+}
+
+

@@ -1,5 +1,6 @@
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api")
-  .replace(/\/$/, "");
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api"
+).replace(/\/$/, "");
 
 function resolvePath(endpoint: string): string {
   return endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
@@ -14,7 +15,10 @@ interface RequestOptions extends RequestInit {
   params?: Record<string, string>;
 }
 
-async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+async function request<T>(
+  endpoint: string,
+  options: RequestOptions = {},
+): Promise<T> {
   const { params, ...init } = options;
 
   let url = `${API_BASE}${resolvePath(endpoint)}`;
@@ -36,13 +40,17 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(url, { ...init, credentials: "include", headers });
+  const response = await fetch(url, {
+    ...init,
+    credentials: "include",
+    headers,
+  });
 
   if (response.status === 401) {
     if (typeof window !== "undefined") {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
-      window.location.href = "/auth/login";
+      window.location.href = "/login";
     }
     throw new Error("Session expired. Please log in again.");
   }
@@ -86,13 +94,15 @@ export const api = {
       if (typeof window !== "undefined") {
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
-        window.location.href = "/auth/login";
+        window.location.href = "/login";
       }
       throw new Error("Session expired. Please log in again.");
     }
 
     if (!response.ok) {
-      throw new Error(`Upload Error: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Upload Error: ${response.status} ${response.statusText}`,
+      );
     }
 
     return response.json();

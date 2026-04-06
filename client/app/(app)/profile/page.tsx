@@ -19,12 +19,16 @@ export default function ProfilePage() {
   const { data: user, isPending } = useUserProfile();
 
   if (isPending) {
-    return <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin" /></div>;
+    return (
+      <div className="flex justify-center py-10">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
   }
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
-    router.push("/auth/login"); // ← was "/login", now correct
+    router.push("/login"); // ← was "/login", now correct
   };
 
   return (
@@ -41,7 +45,10 @@ export default function ProfilePage() {
       )}
 
       {/* Sections */}
-      <div className="space-y-2 animate-fade-in-up" style={{ animationDelay: "100ms" }}>
+      <div
+        className="space-y-2 animate-fade-in-up"
+        style={{ animationDelay: "100ms" }}
+      >
         <h3 className="text-xs text-muted-foreground uppercase font-semibold tracking-wider px-1 mb-2">
           Management
         </h3>
@@ -54,13 +61,18 @@ export default function ProfilePage() {
           </div>
           <div className="flex-1">
             <p className="text-sm font-medium">Budgets</p>
-            <p className="text-xs text-muted-foreground">Set monthly category budgets</p>
+            <p className="text-xs text-muted-foreground">
+              Set monthly category budgets
+            </p>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
         </Link>
       </div>
 
-      <div className="space-y-2 animate-fade-in-up" style={{ animationDelay: "160ms" }}>
+      <div
+        className="space-y-2 animate-fade-in-up"
+        style={{ animationDelay: "160ms" }}
+      >
         <h3 className="text-xs text-muted-foreground uppercase font-semibold tracking-wider px-1 mb-2">
           Account Settings
         </h3>
@@ -70,7 +82,9 @@ export default function ProfilePage() {
           </div>
           <div className="flex-1 text-left">
             <p className="text-sm font-medium">Change Password</p>
-            <p className="text-xs text-muted-foreground">Update your password</p>
+            <p className="text-xs text-muted-foreground">
+              Update your password
+            </p>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
         </button>
@@ -81,14 +95,21 @@ export default function ProfilePage() {
           </div>
           <div className="flex-1 text-left">
             <p className="text-sm font-medium">Notification Preferences</p>
-            <p className="text-xs text-muted-foreground">Manage push notifications</p>
+            <p className="text-xs text-muted-foreground">
+              Manage push notifications
+            </p>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
         </button>
       </div>
 
       <div className="animate-fade-in-up" style={{ animationDelay: "220ms" }}>
-        <Button onClick={handleLogout} variant="destructive-outline" className="w-full" size="lg">
+        <Button
+          onClick={handleLogout}
+          variant="destructive-outline"
+          className="w-full"
+          size="lg"
+        >
           <LogOut className="h-4 w-4 mr-2" />
           Log Out
         </Button>

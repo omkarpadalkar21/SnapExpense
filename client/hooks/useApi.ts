@@ -53,7 +53,7 @@ export const useDeleteUserProfile = () => {
 export const useAuthLogin = () => {
   return useMutation({
     mutationFn: (data: Record<string, unknown>) =>
-      api.post<LoginResponse>("/auth/login", data),
+      api.post<LoginResponse>("/login", data),
     onSuccess: (data) => {
       localStorage.setItem("accessToken", data.accessToken);
       if (data.refreshToken) {
@@ -210,7 +210,11 @@ export const useVerifyReceipt = () => {
 
 export const useUploadReceipt = () => {
   return useMutation({
-    mutationFn: (data: { image: File; categoryId?: string; notes?: string }) => {
+    mutationFn: (data: {
+      image: File;
+      categoryId?: string;
+      notes?: string;
+    }) => {
       const formData = new FormData();
       formData.append("image", data.image);
       if (data.categoryId) formData.append("categoryId", data.categoryId);
