@@ -58,9 +58,9 @@ public class ExpensesServiceImpl implements ExpensesService {
 
         return ExpensesSummary.builder()
                 .month(month)
-                .totalSpend(totalSpend)
-                .totalBudget(totalBudget)
-                .remainingBudget(totalBudget.subtract(totalSpend))
+                .totalSpent(totalSpend)
+                .budget(totalBudget)
+                .remaining(totalBudget.subtract(totalSpend))
                 .receiptCount((int) receiptCount)
                 .percentUsed(percentUsed)
                 .build();
@@ -96,10 +96,12 @@ public class ExpensesServiceImpl implements ExpensesService {
             summaries.add(
                     CategoryExpensesSummary.builder()
                             .month(month)
-                            .category(row.getCategory())
-                            .totalSpend(spent)
-                            .totalBudget(budget)
-                            .remainingBudget(budget.subtract(spent))
+                            .category(row.getCategory().getName())
+                            .icon(row.getCategory().getIcon())
+                            .color(row.getCategory().getColor())
+                            .spent(spent)
+                            .budget(budget)
+                            .remaining(budget.subtract(spent))
                             .receiptCount(row.getReceiptCount().intValue())
                             .percentUsed(percentUsed)
                             .build()
@@ -134,12 +136,14 @@ public class ExpensesServiceImpl implements ExpensesService {
                 ));
 
         // Generate all months in range, zero-filling missing ones
+        String currentMonth = YearMonth.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
         return IntStream.range(0, months)
                 .mapToObj(i -> from.plusMonths(i)
                         .format(DateTimeFormatter.ofPattern("yyyy-MM")))
                 .map(m -> new SpendingTrendDTO(
                         m,
-                        spentByMonth.getOrDefault(m, BigDecimal.ZERO)
+                        spentByMonth.getOrDefault(m, BigDecimal.ZERO),
+                        m.equals(currentMonth)
                 ))
                 .toList();
     }

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { WeekCalendarStrip } from "@/components/shared/WeekCalendarStrip";
@@ -23,20 +22,20 @@ import { useMonthSelector } from "@/hooks/useMonthSelector";
 import { useExpensesSummary, useExpensesSummaryCategories, useSpendingTrend, useGetReceipts } from "@/hooks/useApi";
 
 export default function AnalyticsPage() {
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const { monthYear, goToPreviousMonth, goToNextMonth } = useMonthSelector();
   const router = useRouter();
+  // Single source of truth for both month nav and week strip
+  const { monthYear, selectedDate, setSelectedDate, goToPreviousMonth, goToNextMonth } = useMonthSelector();
 
   const monthParam = format(selectedDate, "yyyy-MM");
 
-  const { data: summary, isPending: pendingSummary } =
-    useExpensesSummary(monthParam);
-  const { data: categorySummary, isPending: pendingCats } =
-    useExpensesSummaryCategories(monthParam);
+  const { data: summary, isPending: pendingSummary } = useExpensesSummary(monthParam);
+  const { data: categorySummary, isPending: pendingCats } = useExpensesSummaryCategories(monthParam);
   const { data: trends, isPending: pendingTrends } = useSpendingTrend(6);
   const { data: receiptsPage } = useGetReceipts({ month: monthParam, page: 0, size: 100 });
 
-  const datesWithReceipts = receiptsPage ? [...new Set(receiptsPage.content.map((r) => r.receiptDate))] : [];
+  const datesWithReceipts = receiptsPage
+    ? [...new Set(receiptsPage.content.map((r) => r.receiptDate))]
+    : [];
 
   if (pendingSummary || pendingCats || pendingTrends) {
     return <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin" /></div>;
@@ -65,7 +64,7 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Week Calendar */}
+      {/* Week Calendar — day selection within selected month */}
       <div className="animate-fade-in-up" style={{ animationDelay: "60ms" }}>
         <WeekCalendarStrip
           selectedDate={selectedDate}
@@ -87,15 +86,15 @@ export default function AnalyticsPage() {
             <div className="relative h-3 bg-gray-200 rounded-full overflow-hidden">
               <div
                 className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-700"
-                style={{ width: `${summary.percentUsed}%` }}
+                style={{ width: `${Math.min(Number(summary.percentUsed), 100)}%` }}
               />
             </div>
             <div className="flex justify-between mt-1.5">
               <span className="text-xs text-muted-foreground">
-                {summary.percentUsed.toFixed(2)}% used
+                {Number(summary.percentUsed).toFixed(2)}% used
               </span>
               <span className="text-xs text-muted-foreground">
-                {(100 - summary.percentUsed).toFixed(2)}% remaining
+                Budget: {formatCurrency(summary.budget)}
               </span>
             </div>
           </div>
@@ -109,7 +108,7 @@ export default function AnalyticsPage() {
       {categorySummary && (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold">Analytics</h2>
+            <h2 className="text-base font-semibold">By Category</h2>
             <Link href="/receipts" className="text-sm text-accent font-medium">
               View All →
             </Link>
