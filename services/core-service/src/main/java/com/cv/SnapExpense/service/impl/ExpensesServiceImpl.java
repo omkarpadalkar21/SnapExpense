@@ -39,7 +39,8 @@ public class ExpensesServiceImpl implements ExpensesService {
                 .getAuthentication()
                 .getPrincipal();
 
-        Object[] row = receiptRepository.getMonthlySummary(user, month, from, to);
+        List<Object[]> rows = receiptRepository.getMonthlySummary(user, month, from, to);
+        Object[] row = rows.isEmpty() ? new Object[3] : rows.get(0);
 
         BigDecimal totalSpend = row[0] != null
                 ? new BigDecimal(row[0].toString())
