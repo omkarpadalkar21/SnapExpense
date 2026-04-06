@@ -8,4 +8,6 @@ import lombok.Data;
 public class CategoryResponse {
     private Integer id;
     private String name;
+    private String icon;
+    private String color;
 }

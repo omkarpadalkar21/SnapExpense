@@ -17,4 +17,10 @@ public class Category {
 
     @Column(nullable = false, unique = true, length = 50)
     private String name;
+
+    @Column(length = 10)
+    private String icon;
+
+    @Column(length = 20)
+    private String color;
 }
