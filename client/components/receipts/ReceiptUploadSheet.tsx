@@ -12,14 +12,25 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useReceiptUpload } from "@/hooks/useReceiptUpload";
+import { useGetCategories } from "@/hooks/useApi"; // ← ADD THIS
 
 interface ReceiptUploadSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function ReceiptUploadSheet({ open, onOpenChange }: ReceiptUploadSheetProps) {
+export function ReceiptUploadSheet({
+  open,
+  onOpenChange,
+}: ReceiptUploadSheetProps) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const {
@@ -34,6 +45,8 @@ export function ReceiptUploadSheet({ open, onOpenChange }: ReceiptUploadSheetPro
     reset,
   } = useReceiptUpload();
 
+  const { data: categories } = useGetCategories(); // ← FETCH CATEGORIES
+
   const [reviewData, setReviewData] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -46,15 +59,27 @@ export function ReceiptUploadSheet({ open, onOpenChange }: ReceiptUploadSheetPro
 
   const handleConfirm = useCallback(() => {
     if (!reviewData) return;
-    
+
     // Validations
     if (reviewData.totalAmount < 0) {
       setErrorMsg("Total Amount cannot be negative.");
       return;
     }
-    const itemsTotal = reviewData.items?.reduce((sum: number, item: any) => sum + (Number(item.totalPrice) || 0), 0) || 0;
+    const itemsTotal =
+      reviewData.items?.reduce(
+        (sum: number, item: any) => sum + Number(item.totalPrice),
+        0,
+      ) ?? 0;
     if (reviewData.totalAmount < itemsTotal) {
-      setErrorMsg(`Total Amount (${reviewData.totalAmount}) cannot be less than sum of items (${itemsTotal}).`);
+      setErrorMsg(
+        `Total Amount ${reviewData.totalAmount} cannot be less than sum of items ${itemsTotal}.`,
+      );
+      return;
+    }
+
+    // Require a category
+    if (!reviewData.categoryId) {
+      setErrorMsg("Please select a category.");
       return;
     }
 
@@ -65,21 +90,17 @@ export function ReceiptUploadSheet({ open, onOpenChange }: ReceiptUploadSheetPro
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (file) {
-        selectFile(file);
-      }
+      if (file) selectFile(file);
     },
-    [selectFile]
+    [selectFile],
   );
 
   const handleClose = useCallback(
     (isOpen: boolean) => {
-      if (!isOpen) {
-        reset();
-      }
+      if (!isOpen) reset();
       onOpenChange(isOpen);
     },
-    [onOpenChange, reset]
+    [onOpenChange, reset],
   );
 
   return (
@@ -87,11 +108,12 @@ export function ReceiptUploadSheet({ open, onOpenChange }: ReceiptUploadSheetPro
       <SheetContent side="bottom" className="h-[85vh] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Scan Receipt</SheetTitle>
-          <SheetDescription>Upload or photograph a receipt to extract expense data</SheetDescription>
+          <SheetDescription>
+            Upload or photograph a receipt to extract expense data
+          </SheetDescription>
         </SheetHeader>
-
         <div className="px-6 pb-8 mt-4 space-y-4">
-          {/* Step 1: Capture */}
+          {/* Step 1 – Capture */}
           {step === "idle" && (
             <div className="space-y-3 animate-fade-in-up">
               <button
@@ -103,7 +125,9 @@ export function ReceiptUploadSheet({ open, onOpenChange }: ReceiptUploadSheetPro
                 </div>
                 <div className="text-left">
                   <p className="font-semibold text-foreground">Take Photo</p>
-                  <p className="text-xs text-muted-foreground">Use camera to capture receipt</p>
+                  <p className="text-xs text-muted-foreground">
+                    Use camera to capture receipt
+                  </p>
                 </div>
               </button>
               <input
@@ -123,8 +147,12 @@ export function ReceiptUploadSheet({ open, onOpenChange }: ReceiptUploadSheetPro
                   <ImageIcon className="h-7 w-7 text-accent" />
                 </div>
                 <div className="text-left">
-                  <p className="font-semibold text-foreground">Choose from Gallery</p>
-                  <p className="text-xs text-muted-foreground">Select an existing image</p>
+                  <p className="font-semibold text-foreground">
+                    Choose from Gallery
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Select an existing image
+                  </p>
                 </div>
               </button>
               <input
@@ -135,17 +163,19 @@ export function ReceiptUploadSheet({ open, onOpenChange }: ReceiptUploadSheetPro
                 className="hidden"
               />
 
-              {/* Empty state illustration */}
+              {/* Empty state */}
               <div className="flex flex-col items-center py-8 text-center">
                 <div className="w-24 h-24 rounded-full bg-primary/5 flex items-center justify-center mb-4">
                   <Receipt className="h-10 w-10 text-primary/40" />
                 </div>
-                <p className="text-sm text-muted-foreground">Scan your first receipt to start tracking expenses</p>
+                <p className="text-sm text-muted-foreground">
+                  Scan your first receipt to start tracking expenses
+                </p>
               </div>
             </div>
           )}
 
-          {/* Step 2: Preview & Upload */}
+          {/* Step 2 – Preview / Upload */}
           {step === "uploading" && previewUrl && (
             <div className="space-y-4 animate-fade-in-up">
               <div className="rounded-2xl overflow-hidden bg-gray-100">
@@ -155,40 +185,48 @@ export function ReceiptUploadSheet({ open, onOpenChange }: ReceiptUploadSheetPro
                   className="w-full max-h-64 object-contain"
                 />
               </div>
-
               {progress > 0 && progress < 100 ? (
                 <div className="space-y-2">
-                  <Progress value={progress} className="h-2" indicatorClassName="bg-primary" />
+                  <Progress
+                    value={progress}
+                    className="h-2 indicator-class-name:bg-primary"
+                  />
                   <div className="flex items-center gap-2 justify-center">
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    <p className="text-sm text-muted-foreground">{statusText}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {statusText}
+                    </p>
                   </div>
                 </div>
-              ) : (
-                <Button onClick={uploadAndScan} className="w-full" size="lg">
-                  <Upload className="h-5 w-5 mr-2" />
-                  Upload & Scan
-                </Button>
-              )}
+              ) : null}
+              <Button onClick={uploadAndScan} className="w-full" size="lg">
+                <Upload className="h-5 w-5 mr-2" />
+                Upload &amp; Scan
+              </Button>
             </div>
           )}
 
-          {/* Step 3: Processing complete */}
+          {/* Step 3 – Processing */}
           {step === "processing" && (
             <div className="flex flex-col items-center py-12 animate-fade-in-up">
               <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
               <p className="text-sm text-muted-foreground">{statusText}</p>
-              <Progress value={progress} className="h-2 mt-4 max-w-xs" indicatorClassName="bg-primary" />
+              <Progress
+                value={progress}
+                className="h-2 mt-4 max-w-xs indicator-class-name:bg-primary"
+              />
             </div>
           )}
 
-          {/* Step 4: Review extracted data */}
+          {/* Step 4 – Review */}
           {step === "reviewing" && reviewData && (
             <div className="space-y-4 animate-fade-in-up">
               <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                  <p className="text-sm font-medium text-emerald-800">Data extracted successfully! Review and edit.</p>
+                  <p className="text-sm font-medium text-emerald-800">
+                    Data extracted successfully! Review and edit.
+                  </p>
                 </div>
               </div>
 
@@ -199,118 +237,208 @@ export function ReceiptUploadSheet({ open, onOpenChange }: ReceiptUploadSheetPro
               )}
 
               <div className="space-y-3">
+                {/* Merchant */}
                 <div>
-                  <label className="text-xs text-muted-foreground">Merchant</label>
-                  <Input 
-                    value={reviewData.merchantName || ""} 
-                    onChange={e => setReviewData({...reviewData, merchantName: e.target.value})} 
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Total Amount (₹)</label>
-                  <Input 
-                    type="number" 
-                    value={reviewData.totalAmount || 0} 
-                    onChange={e => setReviewData({...reviewData, totalAmount: parseFloat(e.target.value) || 0})}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Date</label>
-                  <Input 
-                    type="date" 
-                    value={reviewData.receiptDate || new Date().toISOString().split("T")[0]} 
-                    onChange={e => setReviewData({...reviewData, receiptDate: e.target.value})}
+                  <label className="text-xs text-muted-foreground">
+                    Merchant
+                  </label>
+                  <Input
+                    value={reviewData.merchantName}
+                    onChange={(e) =>
+                      setReviewData({
+                        ...reviewData,
+                        merchantName: e.target.value,
+                      })
+                    }
                   />
                 </div>
 
-                {reviewData.items && reviewData.items.length > 0 && (
-                  <div className="mt-4">
-                    <label className="text-xs text-muted-foreground block mb-2">Items</label>
-                    <div className="border rounded-xl overflow-hidden max-h-48 overflow-y-auto">
-                      <table className="w-full text-sm text-left">
-                        <thead className="bg-muted text-muted-foreground text-xs uppercase">
-                          <tr>
-                            <th className="px-3 py-2">Item</th>
-                            <th className="px-3 py-2 text-right">Qty</th>
-                            <th className="px-3 py-2 text-right">Price</th>
-                            <th className="px-3 py-2 text-right">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {reviewData.items.map((item: any, idx: number) => (
-                            <tr key={idx} className="bg-background">
-                              <td className="px-3 py-2">
-                                <Input 
-                                  className="h-8 text-xs px-2"
-                                  value={item.name} 
-                                  onChange={e => {
-                                    const newItems = [...reviewData.items];
-                                    newItems[idx].name = e.target.value;
-                                    setReviewData({...reviewData, items: newItems});
-                                  }}
-                                />
-                              </td>
-                              <td className="px-3 py-2">
-                                <Input 
-                                  className="h-8 text-xs px-2 w-16 text-right ml-auto"
-                                  type="number"
-                                  value={item.quantity} 
-                                  onChange={e => {
-                                    const newItems = [...reviewData.items];
-                                    newItems[idx].quantity = parseFloat(e.target.value) || 0;
-                                    setReviewData({...reviewData, items: newItems});
-                                  }}
-                                />
-                              </td>
-                              <td className="px-3 py-2">
-                                <Input 
-                                  className="h-8 text-xs px-2 w-20 text-right ml-auto"
-                                  type="number"
-                                  value={item.unitPrice} 
-                                  onChange={e => {
-                                    const newItems = [...reviewData.items];
-                                    newItems[idx].unitPrice = parseFloat(e.target.value) || 0;
-                                    setReviewData({...reviewData, items: newItems});
-                                  }}
-                                />
-                              </td>
-                              <td className="px-3 py-2 text-right font-medium">
-                                <Input 
-                                  className="h-8 text-xs px-2 w-20 text-right ml-auto"
-                                  type="number"
-                                  value={item.totalPrice} 
-                                  onChange={e => {
-                                    const newItems = [...reviewData.items];
-                                    newItems[idx].totalPrice = parseFloat(e.target.value) || 0;
-                                    setReviewData({...reviewData, items: newItems});
-                                  }}
-                                />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
+                {/* Total Amount */}
+                <div>
+                  <label className="text-xs text-muted-foreground">
+                    Total Amount
+                  </label>
+                  <Input
+                    type="number"
+                    value={reviewData.totalAmount ?? 0}
+                    onChange={(e) =>
+                      setReviewData({
+                        ...reviewData,
+                        totalAmount: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+
+                {/* Date */}
+                <div>
+                  <label className="text-xs text-muted-foreground">Date</label>
+                  <Input
+                    type="date"
+                    value={
+                      reviewData.receiptDate ??
+                      new Date().toISOString().split("T")[0]
+                    }
+                    onChange={(e) =>
+                      setReviewData({
+                        ...reviewData,
+                        receiptDate: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                {/* ✅ Category — NEW FIELD */}
+                <div>
+                  <label className="text-xs text-muted-foreground">
+                    Category <span className="text-red-500">*</span>
+                  </label>
+                  <Select
+                    value={reviewData.categoryId?.toString() ?? ""}
+                    onValueChange={(val) =>
+                      setReviewData({
+                        ...reviewData,
+                        categoryId: parseInt(val),
+                      })
+                    }
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories?.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id.toString()}>
+                          {cat.icon} {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="text-xs text-muted-foreground">Notes</label>
+                  <Input
+                    value={reviewData.notes ?? ""}
+                    onChange={(e) =>
+                      setReviewData({ ...reviewData, notes: e.target.value })
+                    }
+                    placeholder="Add notes..."
+                  />
+                </div>
               </div>
+
+              {/* Line Items table (unchanged) */}
+              {reviewData.items && reviewData.items.length > 0 && (
+                <div className="mt-4">
+                  <label className="text-xs text-muted-foreground block mb-2">
+                    Items
+                  </label>
+                  <div className="border rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-muted text-muted-foreground text-xs uppercase">
+                        <tr>
+                          <th className="px-3 py-2">Item</th>
+                          <th className="px-3 py-2 text-right">Qty</th>
+                          <th className="px-3 py-2 text-right">Price</th>
+                          <th className="px-3 py-2 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {reviewData.items.map((item: any, idx: number) => (
+                          <tr key={idx} className="bg-background">
+                            <td className="px-3 py-2">
+                              <Input
+                                className="h-8 text-xs px-2"
+                                value={item.name}
+                                onChange={(e) => {
+                                  const newItems = [...reviewData.items];
+                                  newItems[idx].name = e.target.value;
+                                  setReviewData({
+                                    ...reviewData,
+                                    items: newItems,
+                                  });
+                                }}
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <Input
+                                className="h-8 text-xs px-2 w-16 text-right ml-auto"
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const newItems = [...reviewData.items];
+                                  newItems[idx].quantity =
+                                    parseFloat(e.target.value) || 0;
+                                  setReviewData({
+                                    ...reviewData,
+                                    items: newItems,
+                                  });
+                                }}
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <Input
+                                className="h-8 text-xs px-2 w-20 text-right ml-auto"
+                                type="number"
+                                value={item.unitPrice}
+                                onChange={(e) => {
+                                  const newItems = [...reviewData.items];
+                                  newItems[idx].unitPrice =
+                                    parseFloat(e.target.value) || 0;
+                                  setReviewData({
+                                    ...reviewData,
+                                    items: newItems,
+                                  });
+                                }}
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-right font-medium">
+                              <Input
+                                className="h-8 text-xs px-2 w-20 text-right ml-auto"
+                                type="number"
+                                value={item.totalPrice}
+                                onChange={(e) => {
+                                  const newItems = [...reviewData.items];
+                                  newItems[idx].totalPrice =
+                                    parseFloat(e.target.value) || 0;
+                                  setReviewData({
+                                    ...reviewData,
+                                    items: newItems,
+                                  });
+                                }}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               <Button onClick={handleConfirm} className="w-full" size="lg">
                 <CheckCircle2 className="h-5 w-5 mr-2" />
-                Confirm & Save
+                Confirm &amp; Save
               </Button>
             </div>
           )}
 
-          {/* Step 5: Saved */}
+          {/* Step 5 – Saved */}
           {step === "saved" && (
             <div className="flex flex-col items-center py-12 animate-scale-in">
               <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mb-4">
                 <CheckCircle2 className="h-10 w-10 text-success" />
               </div>
               <p className="text-lg font-semibold">Receipt Saved!</p>
-              <p className="text-sm text-muted-foreground mt-1">Your expense has been recorded</p>
-              <Button variant="outline" onClick={() => handleClose(false)} className="mt-6">
+              <p className="text-sm text-muted-foreground mt-1">
+                Your expense has been recorded
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => handleClose(false)}
+                className="mt-6"
+              >
                 Done
               </Button>
             </div>
@@ -323,7 +451,15 @@ export function ReceiptUploadSheet({ open, onOpenChange }: ReceiptUploadSheetPro
 
 function Receipt({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
       <path d="M8 7h8M8 11h8M8 15h5" />
     </svg>
