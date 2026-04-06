@@ -16,12 +16,8 @@ import java.util.UUID;
 public interface ReceiptRepository extends JpaRepository<Receipt, UUID> {
 
     @Query("""
-    SELECT SUM(r.totalAmount), COUNT(r),
-           COALESCE(SUM(mb.budget), 0.0)
+    SELECT SUM(r.totalAmount), COUNT(r)
     FROM Receipt r
-    LEFT JOIN MonthlyBudget mb
-        ON mb.user = r.user
-        AND mb.month = :month
     WHERE r.user = :user
         AND r.receiptDate >= :monthStart
         AND r.receiptDate < :monthEnd
@@ -37,16 +33,12 @@ public interface ReceiptRepository extends JpaRepository<Receipt, UUID> {
     SELECT r.category           AS category,
            SUM(r.totalAmount)   AS spent,
            COUNT(r)             AS receiptCount,
-           COALESCE(mb.budget, 0) AS budget
+           0.0                  AS budget
     FROM Receipt r
-    LEFT JOIN MonthlyBudget mb
-        ON mb.user = r.user
-        AND mb.category = r.category
-        AND mb.month = :month
     WHERE r.user = :user
         AND r.receiptDate >= :monthStart
         AND r.receiptDate < :monthEnd
-    GROUP BY r.category, mb.budget
+    GROUP BY r.category
     ORDER BY SUM(r.totalAmount) DESC
 """)
     List<CategoryBreakdown> getMonthlyCategoryBreakdown(
