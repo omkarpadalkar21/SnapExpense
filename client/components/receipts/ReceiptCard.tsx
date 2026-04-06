@@ -19,10 +19,11 @@ export function ReceiptCard({ receipt }: ReceiptCardProps) {
   const { data: categories } = useExpensesSummaryCategories();
   
   const catSummary = categories?.find((c) => c.category === receipt.category?.name);
-  const spent = catSummary?.spent || receipt.totalAmount;
-  const budget = catSummary?.budget || 5000;
-  const ratio = Math.min((spent / budget) * 100, 100);
-  const isOver = spent > budget;
+  const spent = catSummary?.spent ?? receipt.totalAmount;
+  const budget = catSummary?.budget ?? 0;
+  // If budget is 0, handle division by zero safely
+  const ratio = budget > 0 ? Math.min((spent / budget) * 100, 100) : (spent > 0 ? 100 : 0);
+  const isOver = budget > 0 ? spent > budget : spent > 0;
 
   return (
     <Link

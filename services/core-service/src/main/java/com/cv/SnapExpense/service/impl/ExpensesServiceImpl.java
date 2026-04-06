@@ -1,7 +1,11 @@
 package com.cv.SnapExpense.service.impl;
 
 import com.cv.SnapExpense.dto.*;
+import com.cv.SnapExpense.model.Category;
+import com.cv.SnapExpense.model.MonthlyBudget;
 import com.cv.SnapExpense.model.User;
+import com.cv.SnapExpense.repository.CategoryRepository;
+import com.cv.SnapExpense.repository.MonthlyBudgetRepository;
 import com.cv.SnapExpense.repository.ReceiptRepository;
 import com.cv.SnapExpense.service.ExpensesService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +29,8 @@ import java.util.stream.IntStream;
 public class ExpensesServiceImpl implements ExpensesService {
 
     private final ReceiptRepository receiptRepository;
+    private final MonthlyBudgetRepository monthlyBudgetRepository;
+    private final CategoryRepository categoryRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -38,8 +44,8 @@ public class ExpensesServiceImpl implements ExpensesService {
                 .getAuthentication()
                 .getPrincipal();
 
-        List<Object[]> rows = receiptRepository.getMonthlySummary(user, month, from, to);
-        Object[] row = rows.isEmpty() ? new Object[3] : rows.get(0);
+        List<Object[]> rows = receiptRepository.getMonthlySummary(user, from, to);
+        Object[] row = rows.isEmpty() ? new Object[2] : rows.get(0);
 
         BigDecimal totalSpend = row[0] != null
                 ? new BigDecimal(row[0].toString())
@@ -47,9 +53,11 @@ public class ExpensesServiceImpl implements ExpensesService {
         long receiptCount = row[1] != null
                 ? ((Number) row[1]).longValue()
                 : 0L;
-        BigDecimal totalBudget = row[2] != null
-                ? new BigDecimal(row[2].toString())
-                : BigDecimal.ZERO;
+
+        List<MonthlyBudget> budgets = monthlyBudgetRepository.findAllByUserAndMonth(user, month);
+        BigDecimal totalBudget = budgets.stream()
+                .map(MonthlyBudget::getBudget)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal percentUsed = totalBudget.compareTo(BigDecimal.ZERO) == 0
                 ? BigDecimal.ZERO
@@ -78,15 +86,29 @@ public class ExpensesServiceImpl implements ExpensesService {
                 .getAuthentication()
                 .getPrincipal();
 
-        List<CategoryBreakdown> rows = receiptRepository.getMonthlyCategoryBreakdown(user, month, from, to);
+        List<CategoryBreakdown> rows = receiptRepository.getMonthlyCategoryBreakdown(user, from, to);
+        Map<Integer, CategoryBreakdown> spentByCategory = rows.stream()
+                .collect(Collectors.toMap(r -> r.getCategory().getId(), r -> r));
 
-        if (rows.isEmpty()) return List.of();
+        List<MonthlyBudget> budgets = monthlyBudgetRepository.findAllByUserAndMonth(user, month);
+        Map<Integer, MonthlyBudget> budgetByCategory = budgets.stream()
+                .collect(Collectors.toMap(b -> b.getCategory().getId(), b -> b));
+
+        List<com.cv.SnapExpense.model.Category> allCategories = categoryRepository.findAll();
 
         List<CategoryExpensesSummary> summaries = new ArrayList<>();
 
-        for (CategoryBreakdown row : rows) {
-            BigDecimal spent = row.getSpent() != null ? row.getSpent() : BigDecimal.ZERO;
-            BigDecimal budget = row.getBudget() != null ? row.getBudget() : BigDecimal.ZERO;
+        for (com.cv.SnapExpense.model.Category category : allCategories) {
+            CategoryBreakdown spentRow = spentByCategory.get(category.getId());
+            MonthlyBudget budgetRow = budgetByCategory.get(category.getId());
+
+            BigDecimal spent = spentRow != null && spentRow.getSpent() != null ? spentRow.getSpent() : BigDecimal.ZERO;
+            long count = spentRow != null && spentRow.getReceiptCount() != null ? spentRow.getReceiptCount() : 0L;
+            BigDecimal budget = budgetRow != null && budgetRow.getBudget() != null ? budgetRow.getBudget() : BigDecimal.ZERO;
+
+            if (spent.compareTo(BigDecimal.ZERO) == 0 && budget.compareTo(BigDecimal.ZERO) == 0) {
+                continue; // Skip if no activity and no budget
+            }
 
             BigDecimal percentUsed = budget.compareTo(BigDecimal.ZERO) == 0
                     ? BigDecimal.ZERO
@@ -96,18 +118,19 @@ public class ExpensesServiceImpl implements ExpensesService {
             summaries.add(
                     CategoryExpensesSummary.builder()
                             .month(month)
-                            .category(row.getCategory().getName())
-                            .icon(row.getCategory().getIcon())
-                            .color(row.getCategory().getColor())
+                            .category(category.getName())
+                            .icon(category.getIcon())
+                            .color(category.getColor())
                             .spent(spent)
                             .budget(budget)
                             .remaining(budget.subtract(spent))
-                            .receiptCount(row.getReceiptCount().intValue())
+                            .receiptCount((int) count)
                             .percentUsed(percentUsed)
                             .build()
             );
         }
 
+        summaries.sort((a, b) -> b.getSpent().compareTo(a.getSpent())); // Order by spend descending
         return summaries;
     }
 
