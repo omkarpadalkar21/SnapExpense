@@ -9,6 +9,8 @@ interface HeroCardProps {
 }
 
 export function HeroCard({ summary }: HeroCardProps) {
+  const percentUsed = Math.min(Number(summary.percentUsed) || 0, 100);
+
   return (
     <div className="bg-indigo-950 text-white rounded-2xl p-5 animate-fade-in-up">
       <p className="text-xs text-indigo-300 font-medium">This Month&apos;s Spending</p>
@@ -29,12 +31,12 @@ export function HeroCard({ summary }: HeroCardProps) {
 
       <div className="flex items-center gap-3 mt-4">
         <Progress
-          value={summary.percentUsed}
+          value={percentUsed}
           className="flex-1 h-2.5 bg-indigo-800"
           indicatorClassName="bg-primary"
         />
         <span className="text-xs text-indigo-300 font-medium whitespace-nowrap">
-          {summary.percentUsed}% used
+          {percentUsed.toFixed(1)}% used
         </span>
       </div>
     </div>

@@ -21,26 +21,27 @@ export interface LineItem {
 }
 
 export interface MonthlySummary {
-  totalSpent: number;
-  budget: number;
-  remaining: number;
+  totalSpent: number;   // was totalSpend in old DTO
+  budget: number;       // was totalBudget
+  remaining: number;    // was remainingBudget
   percentUsed: number;
   month: string;
   year: number;
 }
 
 export interface CategorySummary {
-  category: string;
-  spent: number;
-  budget: number;
-  remaining: number;
-  icon: string;
-  color: string;
+  category: string;     // category name
+  icon: string;         // emoji from Category.icon
+  color: string;        // hex from Category.color
+  spent: number;        // was totalSpend
+  budget: number;       // was totalBudget
+  remaining: number;    // was remainingBudget
+  percentUsed: number;
 }
 
 export interface SpendingTrend {
-  month: string;
-  amount: number;
+  month: string;        // "yyyy-MM" format
+  amount: number;       // was totalSpent
   isCurrent: boolean;
 }
 

@@ -10,9 +10,9 @@ import java.time.YearMonth;
 @Builder
 public class ExpensesSummary {
     YearMonth month;
-    BigDecimal totalSpend;
-    BigDecimal totalBudget;
-    BigDecimal remainingBudget;
+    BigDecimal totalSpent;    // was totalSpend — matches frontend MonthlySummary.totalSpent
+    BigDecimal budget;         // was totalBudget — matches frontend MonthlySummary.budget
+    BigDecimal remaining;      // was remainingBudget — matches frontend MonthlySummary.remaining
     Integer receiptCount;
     BigDecimal percentUsed;
 }

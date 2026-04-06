@@ -9,5 +9,6 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class SpendingTrendDTO {
     private String month;
-    private BigDecimal totalSpent;
+    private BigDecimal amount;    // was totalSpent — matches frontend SpendingTrend.amount
+    private boolean isCurrent;   // matches frontend SpendingTrend.isCurrent
 }
