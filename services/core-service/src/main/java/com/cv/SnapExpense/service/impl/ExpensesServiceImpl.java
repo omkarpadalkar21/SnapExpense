@@ -44,7 +44,7 @@ public class ExpensesServiceImpl implements ExpensesService {
                 .getAuthentication()
                 .getPrincipal();
 
-        List<Object[]> rows = receiptRepository.getMonthlySummary(user, month,from, to);
+        List<Object[]> rows = receiptRepository.getMonthlySummary(user, from, to);
         Object[] row = rows.isEmpty() ? new Object[2] : rows.get(0);
 
         BigDecimal totalSpend = row[0] != null
@@ -86,7 +86,7 @@ public class ExpensesServiceImpl implements ExpensesService {
                 .getAuthentication()
                 .getPrincipal();
 
-        List<CategoryBreakdown> rows = receiptRepository.getMonthlyCategoryBreakdown(user, month,from, to);
+        List<CategoryBreakdown> rows = receiptRepository.getMonthlyCategoryBreakdown(user, from, to);
         Map<Integer, CategoryBreakdown> spentByCategory = rows.stream()
                 .collect(Collectors.toMap(r -> r.getCategory().getId(), r -> r));
 

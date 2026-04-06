@@ -24,7 +24,6 @@ public interface ReceiptRepository extends JpaRepository<Receipt, UUID> {
 """)
     List<Object[]> getMonthlySummary(
             @Param("user") User user,
-            @Param("month") YearMonth month,
             @Param("monthStart") LocalDate monthStart,
             @Param("monthEnd") LocalDate monthEnd
     );
@@ -43,7 +42,6 @@ public interface ReceiptRepository extends JpaRepository<Receipt, UUID> {
 """)
     List<CategoryBreakdown> getMonthlyCategoryBreakdown(
             @Param("user") User user,
-            @Param("month") YearMonth month,
             @Param("monthStart") LocalDate monthStart,
             @Param("monthEnd") LocalDate monthEnd
     );
