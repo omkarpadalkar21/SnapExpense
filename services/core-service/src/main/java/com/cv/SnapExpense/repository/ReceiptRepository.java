@@ -17,7 +17,7 @@ public interface ReceiptRepository extends JpaRepository<Receipt, UUID> {
 
     @Query("""
     SELECT SUM(r.totalAmount), COUNT(r),
-           COALESCE(SUM(mb.budget), 0)
+           COALESCE(SUM(mb.budget), 0.0)
     FROM Receipt r
     LEFT JOIN MonthlyBudget mb
         ON mb.user = r.user
