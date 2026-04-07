@@ -137,6 +137,7 @@ export const useExpensesSummary = (month?: string) => {
         month ? { month } : undefined,
       ),
     enabled: canFetch,
+    staleTime: 0, // Always refetch after invalidation so totals stay current
   });
 };
 
@@ -150,6 +151,7 @@ export const useExpensesSummaryCategories = (month?: string) => {
         month ? { month } : undefined,
       ),
     enabled: canFetch,
+    staleTime: 0, // Always refetch after invalidation so charts stay current
   });
 };
 
@@ -256,11 +258,13 @@ export const useCreateReceipt = () => {
   return useMutation({
     mutationFn: (data: unknown) =>
       api.post<Receipt>("/receipts", data),
-    onSuccess: () => {
-      // Invalidates ["receipts", ...] and ["expenses", ...] prefix — covers
-      // summary, categories, trend so analytics cards update immediately
-      queryClient.invalidateQueries({ queryKey: ["receipts"] });
-      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    onSuccess: async () => {
+      // Await both invalidations so React Query schedules refetches
+      // before the mutation is considered complete — prevents stale totals
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["receipts"] }),
+        queryClient.invalidateQueries({ queryKey: ["expenses"] }),
+      ]);
     },
   });
 };

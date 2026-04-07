@@ -15,13 +15,13 @@ export function CategoryCards({ data }: CategoryCardsProps) {
     <div className="animate-fade-in-up" style={{ animationDelay: "100ms" }}>
       <div className="flex overflow-x-auto gap-3 hide-scrollbar pb-1">
         {data.map((item, index) => {
-          const ratio = Math.min((item.spent / item.budget) * 100, 100);
+          const ratio = item.budget > 0 ? Math.min((item.spent / item.budget) * 100, 100) : 0;
           const color = CARD_COLORS[index % CARD_COLORS.length];
 
           return (
             <div
               key={item.category}
-              className="min-w-[130px] bg-white rounded-2xl p-3.5 shadow-sm border border-border flex-shrink-0"
+              className="min-w-[130px] bg-white rounded-2xl p-3.5 shadow-sm border border-border shrink-0"
             >
               <div
                 className="w-9 h-9 rounded-xl flex items-center justify-center text-base mb-2"

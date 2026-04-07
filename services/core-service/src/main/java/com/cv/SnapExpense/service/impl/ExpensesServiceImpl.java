@@ -1,7 +1,6 @@
 package com.cv.SnapExpense.service.impl;
 
 import com.cv.SnapExpense.dto.*;
-import com.cv.SnapExpense.model.Category;
 import com.cv.SnapExpense.model.MonthlyBudget;
 import com.cv.SnapExpense.model.User;
 import com.cv.SnapExpense.repository.CategoryRepository;
@@ -9,6 +8,7 @@ import com.cv.SnapExpense.repository.MonthlyBudgetRepository;
 import com.cv.SnapExpense.repository.ReceiptRepository;
 import com.cv.SnapExpense.service.ExpensesService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,11 +19,13 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ExpensesServiceImpl implements ExpensesService {
@@ -47,6 +49,10 @@ public class ExpensesServiceImpl implements ExpensesService {
         List<Object[]> rows = receiptRepository.getMonthlySummary(user, from, to);
         Object[] row = rows.isEmpty() ? new Object[2] : rows.get(0);
 
+        for(var r :rows){
+            log.info(Arrays.toString(r));
+        }
+
         BigDecimal totalSpend = row[0] != null
                 ? new BigDecimal(row[0].toString())
                 : BigDecimal.ZERO;
@@ -64,7 +70,7 @@ public class ExpensesServiceImpl implements ExpensesService {
                 : totalSpend.divide(totalBudget, 4, RoundingMode.HALF_UP)
                 .multiply(BigDecimal.valueOf(100));
 
-        return ExpensesSummary.builder()
+        ExpensesSummary summary = ExpensesSummary.builder()
                 .month(month)
                 .totalSpent(totalSpend)
                 .budget(totalBudget)
@@ -72,6 +78,9 @@ public class ExpensesServiceImpl implements ExpensesService {
                 .receiptCount((int) receiptCount)
                 .percentUsed(percentUsed)
                 .build();
+
+        log.info(String.valueOf(summary));
+        return summary;
     }
 
     @Override

@@ -102,10 +102,17 @@ export default function AnalyticsPage() {
       )}
 
       {/* Donut Chart */}
-      {categorySummary && <DonutChart data={categorySummary} />}
+      {categorySummary && categorySummary.length > 0 ? (
+        <DonutChart data={categorySummary} />
+      ) : (
+        <div className="flex flex-col items-center py-10 text-center text-muted-foreground">
+          <p className="text-sm">No spending data for {monthYear}</p>
+          <p className="text-xs mt-1">Upload a receipt to start tracking.</p>
+        </div>
+      )}
 
       {/* Category Cards */}
-      {categorySummary && (
+      {categorySummary && categorySummary.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-semibold">By Category</h2>
@@ -118,7 +125,7 @@ export default function AnalyticsPage() {
       )}
 
       {/* Trend Chart */}
-      {trends && (
+      {trends && trends.length > 0 && (
         <div>
           <h2 className="text-base font-semibold mb-3">Monthly Trend</h2>
           <TrendBarChart data={trends} />
@@ -126,7 +133,7 @@ export default function AnalyticsPage() {
       )}
 
       {/* Comparison Table */}
-      {categorySummary && (
+      {categorySummary && categorySummary.length > 0 && (
         <div className="animate-fade-in-up" style={{ animationDelay: "200ms" }}>
           <h2 className="text-base font-semibold mb-3">Category Comparison</h2>
           <div className="bg-white rounded-2xl shadow-sm border border-border overflow-hidden">

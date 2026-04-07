@@ -21,27 +21,27 @@ public interface ReceiptRepository extends JpaRepository<Receipt, UUID> {
      * Month/category params use IS NULL checks so callers can pass null to skip filtering.
      */
     @Query("""
-    SELECT r FROM Receipt r
-    WHERE r.user = :user
-      AND (:monthStart IS NULL OR r.receiptDate >= :monthStart)
-      AND (:monthEnd   IS NULL OR r.receiptDate <  :monthEnd)
-      AND (:categoryId IS NULL OR r.category.id = :categoryId)
-    """)
+            SELECT r FROM Receipt r
+            WHERE r.user = :user
+              AND (cast(:monthStart as date) IS NULL OR r.receiptDate >= :monthStart)
+              AND (cast(:monthEnd as date)   IS NULL OR r.receiptDate <  :monthEnd)
+              AND (cast(:categoryId as int) IS NULL OR r.category.id = :categoryId)
+            """)
     Page<Receipt> findByUserFiltered(
-            @Param("user")        User user,
-            @Param("monthStart")  LocalDate monthStart,
-            @Param("monthEnd")    LocalDate monthEnd,
+            @Param("user") User user,
+            @Param("monthStart") LocalDate monthStart,
+            @Param("monthEnd") LocalDate monthEnd,
             @Param("categoryId") Integer categoryId,
             Pageable pageable
     );
 
     @Query("""
-    SELECT SUM(r.totalAmount), COUNT(r)
-    FROM Receipt r
-    WHERE r.user = :user
-        AND r.receiptDate >= :monthStart
-        AND r.receiptDate < :monthEnd
-""")
+                SELECT SUM(r.totalAmount), COUNT(r)
+                FROM Receipt r
+                WHERE r.user = :user
+                    AND r.receiptDate >= cast(:monthStart as date)
+                    AND r.receiptDate < cast(:monthEnd as date)
+            """)
     List<Object[]> getMonthlySummary(
             @Param("user") User user,
             @Param("monthStart") LocalDate monthStart,
@@ -49,17 +49,17 @@ public interface ReceiptRepository extends JpaRepository<Receipt, UUID> {
     );
 
     @Query("""
-    SELECT r.category           AS category,
-           SUM(r.totalAmount)   AS spent,
-           COUNT(r)             AS receiptCount,
-           0.0                  AS budget
-    FROM Receipt r
-    WHERE r.user = :user
-        AND r.receiptDate >= :monthStart
-        AND r.receiptDate < :monthEnd
-    GROUP BY r.category
-    ORDER BY SUM(r.totalAmount) DESC
-""")
+                SELECT r.category           AS category,
+                       SUM(r.totalAmount)   AS spent,
+                       COUNT(r)             AS receiptCount,
+                       0.0                  AS budget
+                FROM Receipt r
+                WHERE r.user = :user
+                    AND r.receiptDate >= cast(:monthStart as date)
+                    AND r.receiptDate < cast(:monthEnd as date)
+                GROUP BY r.category
+                ORDER BY SUM(r.totalAmount) DESC
+            """)
     List<CategoryBreakdown> getMonthlyCategoryBreakdown(
             @Param("user") User user,
             @Param("monthStart") LocalDate monthStart,
@@ -67,14 +67,14 @@ public interface ReceiptRepository extends JpaRepository<Receipt, UUID> {
     );
 
     @Query(value = """
-        SELECT TO_CHAR(r.receipt_date, 'YYYY-MM') AS month,
-               COALESCE(SUM(r.total_amount), 0)   AS total_spent
-        FROM receipts r
-        WHERE r.user_id = :userId
-            AND r.receipt_date >= :from
-        GROUP BY TO_CHAR(r.receipt_date, 'YYYY-MM')
-        ORDER BY month ASC
-        """, nativeQuery = true)
+            SELECT TO_CHAR(r.receipt_date, 'YYYY-MM') AS month,
+                   COALESCE(SUM(r.total_amount), 0)   AS total_spent
+            FROM receipts r
+            WHERE r.user_id = :userId
+                AND r.receipt_date >= :from
+            GROUP BY TO_CHAR(r.receipt_date, 'YYYY-MM')
+            ORDER BY month ASC
+            """, nativeQuery = true)
     List<SpendingTrendRow> getSpendingTrend(
             @Param("userId") UUID userId,
             @Param("from") LocalDate from

@@ -12,8 +12,10 @@ export default function ReceiptsPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const { data: user } = useUserProfile();
-  const { data: summary } = useExpensesSummary();
+  const monthParam = format(selectedDate, "yyyy-MM");
+  const { data: summary } = useExpensesSummary(monthParam);
   const { data: receiptsPage, isPending: pendingReceipts } = useGetReceipts({
+    month: monthParam,
     page: 0,
     size: 50,
   });
