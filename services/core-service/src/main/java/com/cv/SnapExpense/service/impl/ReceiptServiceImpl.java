@@ -47,26 +47,44 @@ public class ReceiptServiceImpl implements ReceiptService {
     }
 
     @Override
+    @Transactional
     public ReceiptResponse uploadReceipt(MultipartFile image, Integer categoryId, String notes) throws IOException {
         User user = getCurrentUser();
 
         String filePath = s3Service.uploadReceipt(image, user.getId().toString());
-
-        // TODO: Upload image to S3 and get URL
         String imageUrl = s3Service.generateGetPresignedUrl(filePath);
 
-        // TODO: Send presigned URL to FastAPI and get extracted data
         ReceiptOcrResponse receiptOcrResponse = fastAPIService.extractReceiptInfo(imageUrl);
-        // Mocking extracted data for now
+
         Category category = null;
         if (categoryId != null) {
-            category = categoryRepository.findById(categoryId).orElseThrow(() -> new IllegalArgumentException("Category not found"));
+            category = categoryRepository.findById(categoryId)
+                    .orElseThrow(() -> new IllegalArgumentException("Category not found"));
         }
 
-        List<ReceiptItemResponse> itemResponses = new ArrayList<>();
+        // Build and persist the Receipt entity so expenses / analytics queries count it
+        Receipt receipt = Receipt.builder()
+                .user(user)
+                .imageUrl(imageUrl)
+                .category(category)
+                .merchantName(receiptOcrResponse.getMerchantName())
+                .totalAmount(receiptOcrResponse.getTotalAmount())
+                .receiptDate(receiptOcrResponse.getReceiptDate() != null
+                        ? LocalDate.parse(receiptOcrResponse.getReceiptDate())
+                        : LocalDate.now())
+                .ocrConfidence(receiptOcrResponse.getOcrConfidence())
+                .isVerified(false)
+                .notes(notes)
+                .items(new ArrayList<>())
+                .build();
+
+        receipt = receiptRepository.save(receipt);
+
         if (receiptOcrResponse.getItems() != null && !receiptOcrResponse.getItems().isEmpty()) {
-            itemResponses = receiptOcrResponse.getItems().stream()
-                    .map(ocrItem -> ReceiptItemResponse.builder()
+            Receipt finalReceipt = receipt;
+            List<ReceiptItem> items = receiptOcrResponse.getItems().stream()
+                    .map(ocrItem -> ReceiptItem.builder()
+                            .receipt(finalReceipt)
                             .name(ocrItem.getName())
                             .quantity(ocrItem.getQuantity() != null
                                     ? BigDecimal.valueOf(ocrItem.getQuantity())
@@ -74,31 +92,16 @@ public class ReceiptServiceImpl implements ReceiptService {
                             .unitPrice(ocrItem.getUnitPrice() != null
                                     ? BigDecimal.valueOf(ocrItem.getUnitPrice())
                                     : BigDecimal.ZERO)
-                            .totalPrice(ocrItem.getTotalPrice() != null
+                            .totalAmount(ocrItem.getTotalPrice() != null
                                     ? BigDecimal.valueOf(ocrItem.getTotalPrice())
                                     : BigDecimal.ZERO)
                             .build())
                     .collect(Collectors.toList());
+            receipt.setItems(items);
+            receipt = receiptRepository.save(receipt);
         }
 
-        CategoryResponse categoryResponse = null;
-        if (category != null) {
-            categoryResponse = receiptMapper.toReceiptResponse(Receipt.builder().category(category).build()).getCategory();
-        }
-
-        return ReceiptResponse.builder()
-                .imageUrl(imageUrl)
-                .merchantName(receiptOcrResponse.getMerchantName())
-                .totalAmount(receiptOcrResponse.getTotalAmount())
-                .receiptDate(receiptOcrResponse.getReceiptDate() != null
-                        ? LocalDate.parse(receiptOcrResponse.getReceiptDate())
-                        : null)
-                .category(categoryResponse)
-                .items(itemResponses)
-                .ocrConfidence(receiptOcrResponse.getOcrConfidence())
-                .isVerified(false)
-                .notes(notes)
-                .build();
+        return receiptMapper.toReceiptResponse(receipt);
     }
 
     @Override
@@ -147,9 +150,19 @@ public class ReceiptServiceImpl implements ReceiptService {
     @Override
     @Transactional(readOnly = true)
     public PageResponse<ReceiptResponse> getReceipts(String month, Integer categoryId, Pageable pageable) {
-        // TODO: In a real app, you would filter by month and categoryId using a Specification or a custom Query.
-        // For now, this just retrieves all paginated receipts for the current user.
-        Page<Receipt> page = receiptRepository.findAll(pageable); // Should filter by user
+        User user = getCurrentUser();
+
+        // Parse optional month string "yyyy-MM" into a date range
+        LocalDate monthStart = null;
+        LocalDate monthEnd = null;
+        if (month != null && !month.isBlank()) {
+            java.time.YearMonth ym = java.time.YearMonth.parse(month);
+            monthStart = ym.atDay(1);
+            monthEnd   = monthStart.plusMonths(1);
+        }
+
+        Page<Receipt> page = receiptRepository.findByUserFiltered(
+                user, monthStart, monthEnd, categoryId, pageable);
 
         List<ReceiptResponse> content = page.getContent().stream()
                 .map(receiptMapper::toReceiptResponse)

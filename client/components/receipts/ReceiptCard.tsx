@@ -19,11 +19,12 @@ export function ReceiptCard({ receipt }: ReceiptCardProps) {
   const { data: categories } = useExpensesSummaryCategories();
   
   const catSummary = categories?.find((c) => c.category === receipt.category?.name);
-  const spent = catSummary?.spent ?? receipt.totalAmount;
+  // The progress bar shows how much of the category budget has been used this month
+  const categorySpent = catSummary?.spent ?? receipt.totalAmount;
   const budget = catSummary?.budget ?? 0;
   // If budget is 0, handle division by zero safely
-  const ratio = budget > 0 ? Math.min((spent / budget) * 100, 100) : (spent > 0 ? 100 : 0);
-  const isOver = budget > 0 ? spent > budget : spent > 0;
+  const ratio = budget > 0 ? Math.min((categorySpent / budget) * 100, 100) : (categorySpent > 0 ? 100 : 0);
+  const isOver = budget > 0 ? categorySpent > budget : categorySpent > 0;
 
   return (
     <Link
@@ -55,7 +56,7 @@ export function ReceiptCard({ receipt }: ReceiptCardProps) {
           </p>
 
           <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-            <span>Total Spend: <span className="text-foreground font-medium">{formatCurrency(spent)}</span></span>
+            <span>Amount: <span className="text-foreground font-medium">{formatCurrency(receipt.totalAmount)}</span></span>
             <span>|</span>
             <span>Budget: <span className="text-foreground font-medium">{formatCurrency(budget)}</span></span>
           </div>
