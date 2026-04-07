@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useReceiptUpload } from "@/hooks/useReceiptUpload";
+import { useReceiptUpload, type ReviewData } from "@/hooks/useReceiptUpload";
 import { useGetCategories } from "@/hooks/useApi"; // ← ADD THIS
 
 interface ReceiptUploadSheetProps {
@@ -47,7 +47,7 @@ export function ReceiptUploadSheet({
 
   const { data: categories } = useGetCategories(); // ← FETCH CATEGORIES
 
-  const [reviewData, setReviewData] = useState<any>(null);
+  const [reviewData, setReviewData] = useState<ReviewData | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
@@ -67,7 +67,7 @@ export function ReceiptUploadSheet({
     }
     const itemsTotal =
       reviewData.items?.reduce(
-        (sum: number, item: any) => sum + Number(item.totalPrice),
+        (sum: number, item: { totalPrice: number }) => sum + Number(item.totalPrice),
         0,
       ) ?? 0;
     if (reviewData.totalAmount < itemsTotal) {

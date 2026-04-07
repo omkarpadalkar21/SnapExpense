@@ -236,7 +236,6 @@ export const useVerifyReceipt = () => {
 };
 
 export const useUploadReceipt = () => {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: {
       image: File;
@@ -249,20 +248,17 @@ export const useUploadReceipt = () => {
       if (data.notes) formData.append("notes", data.notes);
       return api.upload<Receipt>("/receipts/upload", formData);
     },
-    onSuccess: () => {
-      // Receipt is now persisted on upload — refresh receipts list and all analytics
-      queryClient.invalidateQueries({ queryKey: ["receipts"] });
-      queryClient.invalidateQueries({ queryKey: ["expenses"] });
-    },
   });
 };
 
 export const useCreateReceipt = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<Receipt>) =>
+    mutationFn: (data: unknown) =>
       api.post<Receipt>("/receipts", data),
     onSuccess: () => {
+      // Invalidates ["receipts", ...] and ["expenses", ...] prefix — covers
+      // summary, categories, trend so analytics cards update immediately
       queryClient.invalidateQueries({ queryKey: ["receipts"] });
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
     },

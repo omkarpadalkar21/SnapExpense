@@ -47,7 +47,6 @@ public class ReceiptServiceImpl implements ReceiptService {
     }
 
     @Override
-    @Transactional
     public ReceiptResponse uploadReceipt(MultipartFile image, Integer categoryId, String notes) throws IOException {
         User user = getCurrentUser();
 
@@ -62,29 +61,11 @@ public class ReceiptServiceImpl implements ReceiptService {
                     .orElseThrow(() -> new IllegalArgumentException("Category not found"));
         }
 
-        // Build and persist the Receipt entity so expenses / analytics queries count it
-        Receipt receipt = Receipt.builder()
-                .user(user)
-                .imageUrl(imageUrl)
-                .category(category)
-                .merchantName(receiptOcrResponse.getMerchantName())
-                .totalAmount(receiptOcrResponse.getTotalAmount())
-                .receiptDate(receiptOcrResponse.getReceiptDate() != null
-                        ? LocalDate.parse(receiptOcrResponse.getReceiptDate())
-                        : LocalDate.now())
-                .ocrConfidence(receiptOcrResponse.getOcrConfidence())
-                .isVerified(false)
-                .notes(notes)
-                .items(new ArrayList<>())
-                .build();
-
-        receipt = receiptRepository.save(receipt);
-
+        // Map OCR line items to response DTOs (not persisted yet)
+        List<ReceiptItemResponse> itemResponses = new ArrayList<>();
         if (receiptOcrResponse.getItems() != null && !receiptOcrResponse.getItems().isEmpty()) {
-            Receipt finalReceipt = receipt;
-            List<ReceiptItem> items = receiptOcrResponse.getItems().stream()
-                    .map(ocrItem -> ReceiptItem.builder()
-                            .receipt(finalReceipt)
+            itemResponses = receiptOcrResponse.getItems().stream()
+                    .map(ocrItem -> ReceiptItemResponse.builder()
                             .name(ocrItem.getName())
                             .quantity(ocrItem.getQuantity() != null
                                     ? BigDecimal.valueOf(ocrItem.getQuantity())
@@ -92,16 +73,32 @@ public class ReceiptServiceImpl implements ReceiptService {
                             .unitPrice(ocrItem.getUnitPrice() != null
                                     ? BigDecimal.valueOf(ocrItem.getUnitPrice())
                                     : BigDecimal.ZERO)
-                            .totalAmount(ocrItem.getTotalPrice() != null
+                            .totalPrice(ocrItem.getTotalPrice() != null
                                     ? BigDecimal.valueOf(ocrItem.getTotalPrice())
                                     : BigDecimal.ZERO)
                             .build())
                     .collect(Collectors.toList());
-            receipt.setItems(items);
-            receipt = receiptRepository.save(receipt);
         }
 
-        return receiptMapper.toReceiptResponse(receipt);
+        CategoryResponse categoryResponse = category != null
+                ? receiptMapper.toCategoryResponse(category)
+                : null;
+
+        // Return preview DTO only — not yet saved to DB.
+        // The frontend lets the user review/edit, then calls POST /receipts to persist.
+        return ReceiptResponse.builder()
+                .imageUrl(imageUrl)
+                .merchantName(receiptOcrResponse.getMerchantName())
+                .totalAmount(receiptOcrResponse.getTotalAmount())
+                .receiptDate(receiptOcrResponse.getReceiptDate() != null
+                        ? LocalDate.parse(receiptOcrResponse.getReceiptDate())
+                        : LocalDate.now())
+                .category(categoryResponse)
+                .items(itemResponses)
+                .ocrConfidence(receiptOcrResponse.getOcrConfidence())
+                .isVerified(false)
+                .notes(notes)
+                .build();
     }
 
     @Override
