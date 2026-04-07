@@ -4,16 +4,36 @@ import com.cv.SnapExpense.dto.CategoryBreakdown;
 import com.cv.SnapExpense.dto.SpendingTrendRow;
 import com.cv.SnapExpense.model.Receipt;
 import com.cv.SnapExpense.model.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 
 public interface ReceiptRepository extends JpaRepository<Receipt, UUID> {
+
+    /**
+     * Fetch receipts for a specific user, with optional month range and category filters.
+     * Month/category params use IS NULL checks so callers can pass null to skip filtering.
+     */
+    @Query("""
+    SELECT r FROM Receipt r
+    WHERE r.user = :user
+      AND (:monthStart IS NULL OR r.receiptDate >= :monthStart)
+      AND (:monthEnd   IS NULL OR r.receiptDate <  :monthEnd)
+      AND (:categoryId IS NULL OR r.category.id = :categoryId)
+    """)
+    Page<Receipt> findByUserFiltered(
+            @Param("user")        User user,
+            @Param("monthStart")  LocalDate monthStart,
+            @Param("monthEnd")    LocalDate monthEnd,
+            @Param("categoryId") Integer categoryId,
+            Pageable pageable
+    );
 
     @Query("""
     SELECT SUM(r.totalAmount), COUNT(r)
